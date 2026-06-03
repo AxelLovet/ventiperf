@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Outils Ambulancier — CORFA</title>
+  <style>
+    :root{--bg:#0f1117;--surface:#1c1f2b;--surface2:#252836;--primary:#3b82f6;--primary-dark:#2563eb;--danger:#ef4444;--success:#22c55e;--warning:#f59e0b;--text:#f1f5f9;--text-muted:#94a3b8;--border:#2e3347;--flash:#facc15;--radius:14px;--radius-sm:8px;}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:16px;-webkit-tap-highlight-color:transparent;}
+    .app{display:flex;flex-direction:column;min-height:100vh;max-width:520px;margin:0 auto;}
+    header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 16px 0;position:sticky;top:0;z-index:100;}
+    .header-title{font-size:.9rem;font-weight:700;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px;}
+    .tabs{display:flex;gap:2px;}
+    .tab-btn{flex:1;padding:11px 4px;border:none;background:transparent;color:var(--text-muted);font-size:.9rem;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;transition:color .2s,border-color .2s;}
+    .tab-btn.active{color:var(--primary);border-bottom-color:var(--primary);}
+    .content{flex:1;padding:16px;overflow-y:auto;}
+    .module{display:none;}.module.active{display:block;}
+    .disclaimer{background:#1e1a0e;border:1px solid #78350f;border-radius:var(--radius-sm);padding:10px 14px;font-size:.75rem;color:#fbbf24;margin-bottom:16px;line-height:1.4;}
+    /* VENTILATION */
+    .vent-info-card{background:var(--surface);border-radius:var(--radius);padding:14px;margin-bottom:16px;display:flex;justify-content:space-between;}
+    .vent-info-item{flex:1;text-align:center;}
+    .vent-info-label{font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;}
+    .vent-info-value{font-size:1rem;font-weight:700;}
+    .chrono-card{background:var(--surface);border-radius:var(--radius);padding:24px 16px;text-align:center;margin-bottom:16px;overflow:hidden;transition:background .1s;}
+    .chrono-card.flash{background:var(--flash)!important;}
+    .chrono-label{font-size:.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;}
+    .chrono-time{font-size:3.8rem;font-weight:800;letter-spacing:.04em;font-variant-numeric:tabular-nums;line-height:1;margin-bottom:12px;}
+    .ventiler-signal{font-size:1.6rem;font-weight:900;letter-spacing:.1em;color:var(--bg);opacity:0;transition:opacity .1s;min-height:2rem;}
+    .ventiler-signal.show{opacity:1;}
+    .progress-bar-wrap{background:var(--surface2);border-radius:4px;height:8px;margin:14px 0 0;overflow:hidden;}
+    .progress-bar-fill{height:100%;border-radius:4px;background:var(--primary);width:0%;transition:width .05s linear;}
+    .vent-controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+    .vent-controls .btn-start{grid-column:1/-1;}
+    .btn{display:block;width:100%;padding:18px 12px;border:none;border-radius:var(--radius);font-size:1.1rem;font-weight:700;cursor:pointer;transition:opacity .15s,transform .1s;-webkit-user-select:none;user-select:none;}
+    .btn:active{transform:scale(.97);opacity:.85;}.btn:disabled{opacity:.4;cursor:not-allowed;}
+    .btn-primary{background:var(--primary);color:#fff;}.btn-success{background:var(--success);color:#fff;}.btn-danger{background:var(--danger);color:#fff;}.btn-neutral{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+    .wake-lock-status{font-size:.72rem;color:var(--text-muted);text-align:center;margin-top:6px;}
+    /* PERFUSION */
+    .form-group{margin-bottom:16px;}
+    label{display:block;font-size:.8rem;font-weight:600;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;}
+    input[type="number"],select{width:100%;padding:15px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:1.05rem;font-weight:600;appearance:none;-webkit-appearance:none;outline:none;transition:border-color .2s;}
+    input[type="number"]:focus,select:focus{border-color:var(--primary);}
+    input[type="number"]::-webkit-outer-spin-button,input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;}
+    input[type="number"]{-moz-appearance:textfield;}
+    .select-wrap{position:relative;}.select-wrap::after{content:'▾';position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;}
+    #customFactorGroup{display:none;margin-top:8px;}
+    .error-msg{background:#1f0a0a;border:1px solid var(--danger);border-radius:var(--radius-sm);color:#fca5a5;padding:12px 14px;font-size:.85rem;margin-bottom:14px;display:none;}
+    .error-msg.show{display:block;}
+    .result-card{background:var(--surface);border:1.5px solid var(--primary);border-radius:var(--radius);padding:22px 18px;margin-bottom:16px;display:none;}
+    .result-card.show{display:block;}
+    .result-main{font-size:2.1rem;font-weight:900;color:var(--primary);text-align:center;margin-bottom:4px;line-height:1.1;}
+    .result-subtitle{text-align:center;color:var(--text-muted);font-size:.85rem;margin-bottom:18px;}
+    .result-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+    .result-item{background:var(--surface2);border-radius:var(--radius-sm);padding:11px;text-align:center;}
+    .result-item-label{font-size:.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;}
+    .result-item-value{font-size:1.25rem;font-weight:800;}
+    .result-phrase{background:#0d1f0d;border:1px solid var(--success);border-radius:var(--radius-sm);padding:13px;color:#86efac;font-size:.9rem;font-weight:600;text-align:center;line-height:1.4;margin-bottom:12px;}
+    .result-warning{background:#1e1a0e;border:1px solid #78350f;border-radius:var(--radius-sm);padding:11px;color:#fbbf24;font-size:.75rem;line-height:1.4;}
+    /* CORFA */
+    .corfa-search-bar{background:var(--surface);border-radius:var(--radius-sm);border:1.5px solid var(--border);color:var(--text);font-size:1rem;padding:13px 14px;width:100%;outline:none;margin-bottom:10px;}
+    .corfa-search-bar:focus{border-color:var(--primary);}
+    .corfa-filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+    .corfa-filter-select{flex:1;min-width:120px;padding:10px 12px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:.82rem;font-weight:600;appearance:none;-webkit-appearance:none;outline:none;}
+    .corfa-filter-select:focus{border-color:var(--primary);}
+    .corfa-list-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+    .corfa-count{font-size:.78rem;color:var(--text-muted);}
+    .btn-show-all{padding:8px 14px;font-size:.8rem;font-weight:600;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);cursor:pointer;white-space:nowrap;}
+    .mol-list{display:flex;flex-direction:column;gap:6px;}
+    .mol-item{background:var(--surface);border-radius:var(--radius-sm);padding:13px 14px;cursor:pointer;border-left:3px solid var(--border);transition:border-color .15s,background .15s;}
+    .mol-item:active{background:var(--surface2);}
+    .mol-item.active-item{border-left-color:var(--primary);}
+    .mol-item-name{font-size:1rem;font-weight:700;margin-bottom:2px;}
+    .mol-item-sub{font-size:.75rem;color:var(--text-muted);}
+    .mol-item-badges{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
+    /* FICHE */
+    .fiche-container{display:none;}
+    .fiche-container.show{display:block;}
+    .fiche-back{display:flex;align-items:center;gap:8px;padding:10px 0;margin-bottom:12px;cursor:pointer;color:var(--primary);font-weight:600;font-size:.9rem;background:none;border:none;}
+    .fiche-title{font-size:1.5rem;font-weight:900;margin-bottom:4px;}
+    .fiche-commercial{font-size:.88rem;color:var(--text-muted);margin-bottom:4px;}
+    .fiche-classe{font-size:.82rem;color:var(--text-muted);font-style:italic;margin-bottom:12px;}
+    .fiche-section{margin-bottom:14px;}
+    .fiche-section-title{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border);}
+    .algo-badge{display:inline-block;background:#1e2a3a;border:1px solid var(--primary);color:var(--primary);border-radius:20px;padding:3px 10px;font-size:.72rem;font-weight:600;margin:2px;}
+    .dosage-card{background:var(--surface2);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:6px;}
+    .dosage-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:4px;}
+    .dosage-value{font-size:.95rem;font-weight:700;color:var(--text);line-height:1.4;}
+    .dosage-adult{border-left:3px solid var(--success);}
+    .dosage-ped{border-left:3px solid var(--primary);}
+    .dosage-info{border-left:3px solid var(--warning);}
+    .ci-list li,.ei-list li,.rq-list li{font-size:.88rem;line-height:1.5;padding:3px 0;}
+    .ci-list li::before{content:"⛔ ";}.ei-list li::before{content:"⚠️ ";}.rq-list li::before{content:"ℹ️ ";}
+    .source-list li{font-size:.75rem;color:var(--text-muted);padding:2px 0;line-height:1.4;}
+    .source-list li::before{content:"📄 ";}
+    .badge-route{display:inline-block;border-radius:4px;padding:2px 7px;font-size:.68rem;font-weight:700;margin:2px;text-transform:uppercase;}
+    .badge-iv{background:#1e3a5f;color:#60a5fa;}.badge-im{background:#1a3a2a;color:#4ade80;}.badge-in{background:#2a1a3a;color:#c084fc;}.badge-po{background:#3a2a0e;color:#fbbf24;}.badge-sc{background:#2a1a1a;color:#f87171;}.badge-inh{background:#1a2a3a;color:#67e8f9;}.badge-io{background:#1f1f1f;color:#d1d5db;}.badge-ir{background:#2a1a0e;color:#fb923c;}
+    .no-results{text-align:center;color:var(--text-muted);padding:30px;font-size:.9rem;}
+    footer{text-align:center;font-size:.68rem;color:var(--text-muted);padding:12px 16px;border-top:1px solid var(--border);background:var(--surface);line-height:1.5;}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="header-title">⚕ Outils Ambulancier</div>
+    <nav class="tabs" role="tablist">
+      <button class="tab-btn active" id="tab-vent" onclick="switchTab('ventilation')">🫁 Ventilation</button>
+      <button class="tab-btn" id="tab-perf" onclick="switchTab('perfusion')">💧 Perfusion</button>
+      <button class="tab-btn" id="tab-corf" onclick="switchTab('corfa')">💊 CORFA</button>
+    </nav>
+  </header>
+  <div class="content">
+    <!-- MODULE VENTILATION -->
+    <section class="module active" id="module-ventilation">
+      <div class="disclaimer">⚠️ Cet outil ne remplace pas le jugement clinique, les protocoles locaux ni la surveillance du patient.</div>
+      <div class="vent-info-card">
+        <div class="vent-info-item"><div class="vent-info-label">Intervalle</div><div class="vent-info-value">6 sec</div></div>
+        <div class="vent-info-item"><div class="vent-info-label">Fréquence</div><div class="vent-info-value">10 / min</div></div>
+        <div class="vent-info-item"><div class="vent-info-label">Ventilations</div><div class="vent-info-value" id="ventCount">0</div></div>
+      </div>
+      <div class="chrono-card" id="chronoCard">
+        <div class="chrono-label">Temps écoulé</div>
+        <div class="chrono-time" id="chronoDisplay">00:00</div>
+        <div class="ventiler-signal" id="ventSignal">VENTILER !</div>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progressBar"></div></div>
+      </div>
+      <div class="vent-controls">
+        <button class="btn btn-success btn-start" id="btnStart" onclick="ventStart()">▶ Démarrer</button>
+        <button class="btn btn-neutral" id="btnPause" onclick="ventPause()" disabled>⏸ Pause</button>
+        <button class="btn btn-neutral" id="btnReset" onclick="ventReset()" disabled>↺ Réinit.</button>
+      </div>
+      <div class="wake-lock-status" id="wakeLockStatus"></div>
+    </section>
+
+    <!-- MODULE PERFUSION -->
+    <section class="module" id="module-perfusion">
+      <div class="disclaimer">⚠️ Cet outil ne remplace pas le jugement clinique, les protocoles locaux ni la surveillance du patient.</div>
+      <div class="form-group"><label for="inputVolume">Volume de la poche (ml)</label><input type="number" id="inputVolume" placeholder="ex. 100" min="1" inputmode="decimal"/></div>
+      <div class="form-group"><label for="inputTime">Durée d'administration (minutes)</label><input type="number" id="inputTime" placeholder="ex. 10" min="1" inputmode="decimal"/></div>
+      <div class="form-group">
+        <label for="inputFactor">Facteur de gouttes (gouttes/ml)</label>
+        <div class="select-wrap"><select id="inputFactor" onchange="onFactorChange()">
+          <option value="10">10 gouttes/ml</option><option value="15">15 gouttes/ml</option>
+          <option value="20" selected>20 gouttes/ml (défaut NaCl / Ringer)</option>
+          <option value="60">60 gouttes/ml (micro-gouttes)</option>
+          <option value="custom">Valeur personnalisée…</option>
+        </select></div>
+        <div id="customFactorGroup"><input type="number" id="inputCustomFactor" placeholder="Entrez le facteur (ex. 12)" min="1" inputmode="decimal"/></div>
+      </div>
+      <div class="error-msg" id="perfError" role="alert"></div>
+      <button class="btn btn-primary" onclick="perfCalculate()" style="margin-bottom:16px;">⚡ Calculer</button>
+      <div class="result-card" id="perfResults">
+        <div class="result-main" id="resMain">—</div>
+        <div class="result-subtitle">gouttes par seconde</div>
+        <div class="result-grid">
+          <div class="result-item"><div class="result-item-label">Gouttes / min</div><div class="result-item-value" id="resGPM">—</div></div>
+          <div class="result-item"><div class="result-item-label">Total gouttes</div><div class="result-item-value" id="resTotalG">—</div></div>
+        </div>
+        <div class="result-phrase" id="resPhraseEl"></div>
+        <div class="result-warning">⚠️ Vérifier le facteur de gouttes de la tubulure utilisée et respecter les protocoles locaux.</div>
+      </div>
+    </section>
+
+    <!-- MODULE CORFA -->
+    <section class="module" id="module-corfa">
+      <div class="disclaimer">⚠️ Les informations affichées proviennent uniquement des documents CORFA fournis (Pharmacologie v4.0 2025 + Algorithmes v6.0 2025). Vérifier le document officiel et les protocoles locaux avant toute administration.</div>
+      <!-- Liste -->
+      <div id="corfaListView">
+        <input class="corfa-search-bar" type="search" id="corfaSearch" placeholder="🔍 Rechercher une molécule…" oninput="corfaFilter()" autocomplete="off"/>
+        <div class="corfa-filters">
+          <div class="select-wrap" style="flex:1;min-width:130px;"><select class="corfa-filter-select" id="filterAlgo" onchange="corfaFilter()"><option value="">Tous les algorithmes</option></select></div>
+          <div class="select-wrap" style="flex:1;min-width:110px;"><select class="corfa-filter-select" id="filterClasse" onchange="corfaFilter()"><option value="">Toutes les classes</option></select></div>
+        </div>
+        <div class="corfa-list-header">
+          <span class="corfa-count" id="corfaCount">49 molécules</span>
+          <button class="btn-show-all" onclick="corfaShowAll()">Tout afficher</button>
+        </div>
+        <div class="mol-list" id="molList"></div>
+        <div class="no-results" id="noResults" style="display:none;">Aucune molécule trouvée.</div>
+      </div>
+      <!-- Fiche détaillée -->
+      <div class="fiche-container" id="ficheView">
+        <button class="fiche-back" onclick="corfaBackToList()">← Retour à la liste</button>
+        <div id="ficheContent"></div>
+      </div>
+    </section>
+  </div><!-- /content -->
+  <footer>Cet outil ne remplace pas le jugement clinique, les protocoles locaux ni la surveillance du patient. — v2.0 CORFA</footer>
+</div><!-- /app -->
+<script>
+const corfaMedicaments = [
+{
+  molecule:"Acide Acétylsalicylique (AAS)",nomCommercial:"Aspirine®, Aspégic®",classe:"Antiagrégant plaquettaire / AINS",
+  algorithmes:["Douleurs thoraciques","Retour à la circulation spontanée (ROSC)"],
+  indications:["Syndrome coronarien aigu (SCA)","Traitement antiagrégant en phase pré-hospitalière"],
+  dosages:{adulte:"250 mg IV/PO",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"Dose unique",doseMax:"Non précisé",voie:"IV, PO",dilution:"Non précisé",vitesse:"Non précisé"},
+  contreIndications:["Allergie","Patient pédiatrique < 12 ans (risque syndrome de Reye)","Enfants/adolescents < 16 ans avec fièvre et/ou infection virale","Hémophilie","Dernier trimestre de grossesse (relative)"],
+  effetsSecondaires:["Troubles gastriques (intolérance)","Ulcères gastro-duodénaux","Saignements gastro-intestinaux (à doses antithrombotiques)"],
+  remarques:["Si allergie AAS : utiliser Clopidogrel ou Prasugrel PO selon algorithme douleurs thoraciques"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.17 — Acide Acétylsalicylique","Algorithmes CORFA 6.0, p.14 — Douleurs thoraciques","Algorithmes CORFA 6.0, p.13 — Retour à la circulation spontanée"]
+},
+{
+  molecule:"Acide Tranexamique (TXA)",nomCommercial:"Tranexam®",classe:"Antifibrinolytique",
+  algorithmes:["État de choc traumatique","Hémorragie post-partum primaire","État de choc NT/T – Pédiatrie"],
+  indications:["Hémorragie traumatique","Hémorragie du post-partum","Choc hémorragique"],
+  dosages:{adulte:"> 60 kg : 1 g IVL sur 10 min\n< 60 kg : 15 mg/kg IVL sur 10 min\nAlternative : IM possible",pediatrie:"15 mg/kg IVL (max 1000 mg/dose)",repetition:"Dose unique",doseMax:"1 g (adulte), 1000 mg (pédiatrie)",voie:"IV, IM",dilution:"Diluer dans NaCl 0.9% 100 mL (adulte)",vitesse:"Administrer sur 10 minutes — administrer le plus tôt possible, idéalement dans l'heure, jamais au-delà de 3h post-événement"},
+  contreIndications:["Administration > 3 heures après l'événement hémorragique","Thrombose veineuse ou artérielle aiguë","Insuffisance rénale grave","Antécédents de convulsions"],
+  effetsSecondaires:["Nausées, vomissements, diarrhées","Hypotension (injection trop rapide)","Thrombose veineuse ou artérielle","Vertiges, convulsions"],
+  remarques:["Ne doit pas retarder la prise en charge — administrer pendant le transport","Accès veineux unique si possible"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.21 — Acide Tranexamique","Algorithmes CORFA 6.0, p.24 — État de choc traumatique","Algorithmes CORFA 6.0, p.37 — État de choc NT/T Pédiatrie","Algorithmes CORFA 6.0, p.51 — Hémorragie post-partum primaire"]
+},
+{
+  molecule:"Adénosine",nomCommercial:"Krénosin®",classe:"Anti-arythmique",
+  algorithmes:["Troubles du rythme"],
+  indications:["Tachycardie paroxystique supraventriculaire (TPSV) — QRS fins, régulier"],
+  dosages:{adulte:"6 mg IV bolus (1–2 secondes). Si sans effet : 12 mg IV bolus (répétable 1x)",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"Si sans effet : 12 mg × 2 doses supplémentaires",doseMax:"6 + 12 + 12 mg",voie:"IV (CVP proximal de préférence)",dilution:"Non dilué — bolus strict",vitesse:"Bolus en 1–2 secondes, suivi d'un flush de 20 mL NaCl 0.9%"},
+  contreIndications:["BAV 2e ou 3e degré (sauf patients appareillés)","Bradycardie (sauf patients appareillés)","BPCO / asthme bronchique","Hypersensibilité connue à l'adénosine","Syndrome du QT long"],
+  effetsSecondaires:["Bradycardie, asystolie transitoire, pause sinusale","Céphalées, vertiges","Oppression thoracique, sensation de brûlure","Bronchospasme (rare)","Hypotension"],
+  remarques:["Demi-vie < 10 secondes : effets secondaires transitoires","Ne pas utiliser si flutter/FA (pas d'effet)"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.25 — Adénosine","Algorithmes CORFA 6.0, p.15 — Troubles du rythme"]
+},
+{
+  molecule:"Adrénaline",nomCommercial:"Adrénaline® (Epinephrine)",classe:"Sympathicomimétique / Catécholamine",
+  algorithmes:["ACR non traumatique","ACR traumatique","Retour à la circulation spontanée (ROSC)","Troubles du rythme","Réaction anaphylactique","État de choc NT","Traumatisme médullaire","Détresse respiratoire – Pédiatrie","ACR – Pédiatrie","Réaction anaphylactique – Pédiatrie"],
+  indications:["Arrêt cardio-respiratoire (FV/TV sans pouls, asystolie, AESP)","Choc anaphylactique","Trouble du rythme (catécholamine de soutien)","État de choc septique ou neurologique","Faux-croup (nébulisation pédiatrique)"],
+  dosages:{adulte:"ACR : 1 mg IV/IO bolus toutes les 3–5 min\nChoc anaphylactique : 0,3–0,5 mg IM face antéro-externe de la cuisse (auto-injecteur : 0,3 mg IM)\nTitration choc/troubles du rythme : 0,01 à 0,1 mg IV/IO\nNébulisation : 1 à 3 mg ad 5 mL NaCl 0.9%",pediatrie:"ACR : 0,01 mg/kg IV/IO toutes les 3–5 min (max 1 mg/dose)\nChoc anaphylactique IM : < 30 kg → 0,15 mg IM | > 30 kg → 0,3 mg IM\nFaux-croup nébulisation : 4 mg ad 5 mL NaCl 0.9%",repetition:"ACR : toutes les 3–5 min\nAnaphylaxie IM : toutes les 10 min si symptômes persistants",doseMax:"Non précisé (ACR : titration selon réponse)",voie:"IV, IO, IM, nébulisation",dilution:"Non précisé pour l'ACR — voir titration",vitesse:"Bolus IV pour ACR — IVL lente pour titration"},
+  contreIndications:["HTA, glaucome à angle fermé, tachycardie paroxystique, insuffisance rénale grave, coronaropathie sévère","⚠️ Ces CI ne s'appliquent PAS en cas d'ACR ou de choc anaphylactique grave"],
+  effetsSecondaires:["Tachycardie, arythmies, extrasystoles, fibrillation ventriculaire","Hypertension","Hyperglycémie","Agitation, anxiété, tremblements","Nausées, vomissements"],
+  remarques:["En ACR : administrer dès que possible après FV réfractaire à 3 chocs","Anaphylaxie : voie IM (cuisse) est la voie de choix en pré-hospitalier"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.28 — Adrénaline","Algorithmes CORFA 6.0, p.12 — ACR NT","Algorithmes CORFA 6.0, p.17 — Réaction anaphylactique","Algorithmes CORFA 6.0, p.26 — Traumatisme médullaire"]
+},
+{
+  molecule:"Amiodarone",nomCommercial:"Cordarone®",classe:"Anti-arythmique classe III",
+  algorithmes:["ACR non traumatique","ACR traumatique","Troubles du rythme","ACR – Pédiatrie"],
+  indications:["FV/TV sans pouls réfractaire à la défibrillation","Tachyarythmie sévère (flutter, FA, TV)","Tachycardie ventriculaire instable"],
+  dosages:{adulte:"ACR (FV/TV) : 1re dose 300 mg IV/IO, 2e dose 150 mg IV/IO\nTrouble du rythme : 150 mg ad 100 mL G5% ou NaCl 0.9% IVL sur 10–15 min",pediatrie:"FV/TV : 5 mg/kg IV/IO (max 3 doses)",repetition:"ACR : 2e dose de 150 mg après la 1re si nécessaire",doseMax:"Non précisé dans les documents CORFA fournis",voie:"IV, IO",dilution:"Trouble du rythme : diluer dans 100 mL G5% ou NaCl 0.9%",vitesse:"Trouble du rythme : IVL sur 10–15 min"},
+  contreIndications:["Hypersensibilité à l'amiodarone ou à l'iode","Bradycardie sinusale, BAV","⚠️ Ces CI ne s'appliquent PAS lors d'ACR avec FV réfractaire","Hypokaliémie","QT allongé préexistant (relative)"],
+  effetsSecondaires:["Hypotension","Torsades de pointes (si QT allongé)","Bradycardie sinusale résistante à l'atropine","Hypo/hyperthyroïdie (iode)"],
+  remarques:["Allonge l'intervalle QT","Effet non antagonisé par l'atropine"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.32 — Amiodarone","Algorithmes CORFA 6.0, p.12 — ACR NT","Algorithmes CORFA 6.0, p.15 — Troubles du rythme","Algorithmes CORFA 6.0, p.35 — ACR Pédiatrie"]
+},
+{
+  molecule:"Atropine",nomCommercial:"Atropine®",classe:"Parasympatholytique",
+  algorithmes:["Troubles du rythme","Traumatisme médullaire","Traumatisme médullaire – Pédiatrie"],
+  indications:["Bradycardie symptomatique (FC < 50 bpm avec critères d'instabilité)","Intoxication aux organophosphorés","Bradycardie sur traumatisme médullaire"],
+  dosages:{adulte:"Bradycardie : 0,5–1 mg IVD bolus, répétable jusqu'à max 3 mg\nOrganophosphorés : 2 mg toutes les 5–10 min jusqu'à tarissement des sécrétions",pediatrie:"0,02 mg/kg IVD bolus (min 0,1 mg/bolus, max 0,5 mg/bolus)",repetition:"Bradycardie : répéter jusqu'à max 3 mg",doseMax:"3 mg adulte",voie:"IV direct",dilution:"Non dilué — bolus IV direct",vitesse:"Bolus direct — ne jamais injecter trop lentement (effet paradoxal)"},
+  contreIndications:["Tachycardie (absolue)","Sclérose coronarienne, glaucome à angle étroit, mégacôlon, myasthénie grave (relatives)","Hypothermie (relative)"],
+  effetsSecondaires:["Sécheresse buccale et cutanée","Rétention urinaire","Constipation","Mydriase","Tachycardie"],
+  remarques:["Jamais en dessous de 0,5 mg (risque d'effet paradoxal aggravant la bradycardie)","Ne fonctionne pas sur BAV de haut degré infranodal","Non efficace sur bradycardie induite par l'amiodarone"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.35 — Atropine","Algorithmes CORFA 6.0, p.15 — Troubles du rythme","Algorithmes CORFA 6.0, p.26 — Traumatisme médullaire"]
+},
+{
+  molecule:"Butylscopolamine",nomCommercial:"Buscopan®",classe:"Anticholinergique / Spasmolytique",
+  algorithmes:["Antalgie non traumatique"],
+  indications:["Douleur en colique d'origine gastro-intestinale, biliaire ou urinaire (colique néphrétique)"],
+  dosages:{adulte:"20 mg IVL",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"Dose unique",doseMax:"100 mg/jour",voie:"IV (lent), IM, SC",dilution:"1 mL (20 mg) + 9 mL NaCl 0.9%",vitesse:"IVL — injection lente"},
+  contreIndications:["Tachyarythmie > 150 bpm (absolue)","Glaucome à angle fermé non traité","Adénome prostatique avec rétention urinaire","Sténoses mécaniques du tractus GI","Myasthénie grave"],
+  effetsSecondaires:["Tachycardie","Rétention urinaire","Sécheresse buccale","Hypotension, vertiges","Mydriase"],
+  remarques:["Prudence chez patients avec cardiopathie préexistante"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.39 — Butylscopolamine","Algorithmes CORFA 6.0, p.20 — Antalgie non traumatique"]
+},
+{
+  molecule:"Ceftriaxone",nomCommercial:"Rocéphine®, Ceftriaxon®",classe:"Antibiotique — Céphalosporine 3e génération",
+  algorithmes:["État de choc non traumatique (sepsis)","État septique – Pédiatrie"],
+  indications:["Sepsis / état de choc septique — après prélèvement d'hémocultures"],
+  dosages:{adulte:"2 g IVL dilué dans NaCl 0.9% 100 mL, après hémocultures",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"Dose unique pré-hospitalière",doseMax:"Non précisé",voie:"IV, IM",dilution:"IV : 2 fioles dans 100 mL NaCl 0.9% | IM : 2×1 g dans 4 mL lidocaïne 1% (2 sites d'injection)",vitesse:"IVL"},
+  contreIndications:["Hypersensibilité aux céphalosporines","Ne pas mélanger avec des solutions contenant du calcium (risque de précipitation, surtout nouveau-nés)"],
+  effetsSecondaires:["Réactions allergiques","Problèmes de précipitation avec le calcium chez les nouveau-nés"],
+  remarques:["Administrer après hémocultures — ne pas retarder l'antibiothérapie","Voie IM possible : 2 sites d'injection (1 g par site)"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.42 — Ceftriaxone","Algorithmes CORFA 6.0, p.16 — État de choc NT","Algorithmes CORFA 6.0, p.38 — État septique Pédiatrie"]
+},
+{
+  molecule:"Clémastine",nomCommercial:"Tavegyl®",classe:"Antihistaminique (anti-H1)",
+  algorithmes:["Réaction anaphylactique","Réaction anaphylactique – Pédiatrie"],
+  indications:["Réaction anaphylactique (traitement adjuvant antihistaminique)","Urticaire, œdème allergique (sans choc ni détresse respiratoire)"],
+  dosages:{adulte:"2 mg IVL ou PO, dose unique",pediatrie:"IV : 0,02–0,06 mg/kg IV > 1 an | PO : 0,5–1 mg dès 6 ans",repetition:"Dose unique",doseMax:"Non précisé",voie:"IV (lent), PO",dilution:"Non précisé",vitesse:"IVL"},
+  contreIndications:["Non précisé dans les documents CORFA fournis"],
+  effetsSecondaires:["Somnolence","Sécheresse buccale"],
+  remarques:["Rôle adjuvant — ne remplace pas l'adrénaline dans l'anaphylaxie sévère"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.45 — Clémastine","Algorithmes CORFA 6.0, p.17 — Réaction anaphylactique"]
+},
+{
+  molecule:"Clonazépam",nomCommercial:"Rivotril®",classe:"Benzodiazépine — Anticonvulsivant",
+  algorithmes:["Troubles de la conscience (convulsions)","Trouble de la conscience – Pédiatrie"],
+  indications:["État de mal épileptique","Convulsions persistantes ou récidivantes"],
+  dosages:{adulte:"1 mg IVL/IM, répétable",pediatrie:"0,01 mg/kg IVL/IM (max 0,5 mg)",repetition:"Selon réponse clinique",doseMax:"Non précisé dans les documents CORFA fournis",voie:"IV (lent), IM",dilution:"Non précisé",vitesse:"IVL — injection lente"},
+  contreIndications:["Insuffisance respiratoire sévère","Insuffisance hépatique sévère","Syndrome d'apnée du sommeil","Myasthénie grave"],
+  effetsSecondaires:["Dépression respiratoire","Sédation","Hypotension"],
+  remarques:["Surveiller étroitement la fréquence respiratoire après administration"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.48 — Clonazépam","Algorithmes CORFA 6.0, p.18 — Troubles de la conscience"]
+},
+{
+  molecule:"Clopidogrel",nomCommercial:"Plavix®",classe:"Antiagrégant plaquettaire",
+  algorithmes:["Douleurs thoraciques"],
+  indications:["Syndrome coronarien aigu (SCA) — si allergie à l'AAS ou STEMI avec fibrinolyse"],
+  dosages:{adulte:"300 mg PO dose de charge unique",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"Dose unique",doseMax:"300 mg",voie:"PO",dilution:"Non applicable",vitesse:"Non précisé"},
+  contreIndications:["Saignement pathologique actif","Lésion organique susceptible de saigner (ulcère actif, AVC hémorragique)","Insuffisance hépatique sévère","Hypersensibilité"],
+  effetsSecondaires:["Saignements","Neutropénie/thrombopénie"],
+  remarques:["Utilisé si allergie AAS ou comme alternative selon algorithme douleurs thoraciques"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.51 — Clopidogrel","Algorithmes CORFA 6.0, p.14 — Douleurs thoraciques"]
+},
+{
+  molecule:"Diazépam",nomCommercial:"Valium®",classe:"Benzodiazépine",
+  algorithmes:["Troubles de la conscience (convulsions)","Trouble de la conscience – Pédiatrie"],
+  indications:["Convulsions persistantes ou récidivantes (notamment pédiatrique via voie IR)"],
+  dosages:{adulte:"0,15 à 0,25 mg/kg IV",pediatrie:"IR : 2–<6 ans : 0,5 mg/kg | 6–<12 ans : 0,3 mg/kg | ≥12 ans : 0,2 mg/kg (max 20 mg/dose)",repetition:"Répétable dans les 4–12 h si nécessaire",doseMax:"20 mg/dose",voie:"IV, IR (rectal)",dilution:"Non précisé",vitesse:"Non précisé"},
+  contreIndications:["Insuffisance respiratoire sévère","Insuffisance hépatique sévère","Apnée du sommeil","Myasthénie grave","Hypersensibilité aux BZD"],
+  effetsSecondaires:["Dépression respiratoire","Sédation","Hypotension"],
+  remarques:["Voie IR utile en l'absence d'accès veineux — notamment chez l'enfant"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.53 — Diazépam","Algorithmes CORFA 6.0, p.18 — Troubles de la conscience"]
+},
+{
+  molecule:"Dimétindène",nomCommercial:"Feniallerg®",classe:"Antihistaminique (anti-H1)",
+  algorithmes:["Réaction anaphylactique","Réaction anaphylactique – Pédiatrie"],
+  indications:["Traitement adjuvant antihistaminique dans la réaction anaphylactique","Urticaire, allergies diverses"],
+  dosages:{adulte:"20–40 gouttes (= 1–2 mg) × 3/jour (voie PO habituelle)",pediatrie:"0,1 mg/kg/jour = 2 gouttes/kg/jour en 3 prises (1 mois – 12 ans)",repetition:"En 3 prises quotidiennes",doseMax:"Non précisé",voie:"PO (gouttes)",dilution:"Non précisé",vitesse:"Non précisé"},
+  contreIndications:["Non précisé dans les documents CORFA fournis"],
+  effetsSecondaires:["Somnolence","Sécheresse buccale"],
+  remarques:["Rôle adjuvant — ne remplace pas l'adrénaline dans l'anaphylaxie sévère"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.57 — Dimétindène","Algorithmes CORFA 6.0, p.17 — Réaction anaphylactique"]
+},
+{
+  molecule:"Dropéridol",nomCommercial:"Droperidol Sintetica®",classe:"Butyrophénone — Neuroleptique / Antiémétique",
+  algorithmes:["Présente dans la pharmacologie CORFA, non retrouvée nommément dans les algorithmes fournis"],
+  indications:["Traitement des nausées et vomissements"],
+  dosages:{adulte:"0,5–1 mg IVL (HUG BSC : 0,5 mg IV)",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"Délai min. 8h entre les doses",doseMax:"Non précisé",voie:"IV (lent)",dilution:"Non précisé",vitesse:"IVL — monitoring ECG avant, pendant et jusqu'à 2–3h après"},
+  contreIndications:["Allongement QT connu ou suspecté","Syndrome du QT long congénital"],
+  effetsSecondaires:["Prolongation de l'intervalle QT (dose-dépendante)","Hypotension (effet alpha-bloquant)","Sédation"],
+  remarques:["Monitoring ECG obligatoire avant et pendant l'administration","Attention aux associations médicamenteuses allongeant le QT"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.60 — Dropéridol"]
+},
+{
+  molecule:"Éphédrine",nomCommercial:"Éphédrine®",classe:"Sympathomimétique / Vasoconstricteur",
+  algorithmes:["Présente dans la pharmacologie CORFA, non retrouvée nommément dans les algorithmes fournis"],
+  indications:["Hypotension artérielle résistante au traitement de la cause"],
+  dosages:{adulte:"5–10 mg IV, jusqu'à obtention de la TA ciblée",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"Répétable selon réponse tensionnelle",doseMax:"Non précisé dans les documents CORFA fournis",voie:"IV",dilution:"Non précisé",vitesse:"Non précisé"},
+  contreIndications:["Ne pas utiliser seul en cas d'hypovolémie (corriger d'abord la volémie)"],
+  effetsSecondaires:["Tachycardie","Hypertension","Arythmies"],
+  remarques:["Prudence chez diabétique, cardiopathie ischémique, anévrisme","Peut réduire le volume plasmatique circulant"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.65 — Éphédrine"]
+},
+{
+  molecule:"Ésoméprazole",nomCommercial:"Nexium®, Esomep®",classe:"Inhibiteur de la pompe à protons (IPP)",
+  algorithmes:["Antalgie non traumatique"],
+  indications:["Hémorragie digestive haute / brûlure épigastrique évocatrice de RGO/ulcère"],
+  dosages:{adulte:"80 mg IV (selon algorithme Antalgie NT)",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"Non précisé",doseMax:"Non précisé",voie:"IV",dilution:"Non précisé",vitesse:"Non précisé"},
+  contreIndications:["Hypersensibilité connue à l'ésoméprazole","Insuffisance hépatique"],
+  effetsSecondaires:["Non précisé dans les documents CORFA fournis"],
+  remarques:["Utilisé dans le contexte d'hémorragie digestive haute ou de brûlure épigastrique après exclusion d'une composante cardiaque"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.68 — Ésoméprazole","Algorithmes CORFA 6.0, p.20 — Antalgie non traumatique (note 3)"]
+},
+{
+  molecule:"Étomidate",nomCommercial:"Etomidate Lipuro Braun®",classe:"Anesthésique général — Hypnotique inducteur",
+  algorithmes:["Gestion des voies aériennes et de la ventilation (ISR)"],
+  indications:["Induction en séquence rapide (ISR) pour intubation endotrachéale"],
+  dosages:{adulte:"0,3 mg/kg IV (pur, jamais dilué) — équivalent ~ 20 mg IVD pour 70 kg",pediatrie:"0,3–0,4 mg/kg IV",repetition:"Dose unique pour l'induction",doseMax:"Non précisé",voie:"IV direct",dilution:"Ne pas diluer",vitesse:"Injection directe — délai d'action 15–45 sec, durée 3–12 min"},
+  contreIndications:["Non précisé dans les documents CORFA fournis (hormis usage limité ISR)"],
+  effetsSecondaires:["Suppression corticosurrénale réversible (~24h après dose unique)","Mouvements myocloniques","Douleur à l'injection"],
+  remarques:["Pas d'effet analgésique — associer fentanyl","Pas de modification hémodynamique notable : avantage lors d'instabilité"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.71 — Étomidate"]
+},
+{
+  molecule:"Fentanyl",nomCommercial:"Fentanyl®, Actiq®",classe:"Opioïde de synthèse",
+  algorithmes:["Douleurs thoraciques","Antalgie non traumatique","Antalgie traumatique","Gestion VA/ventilation (ISR)","Antalgie NT – Pédiatrie","Antalgie traumatique – Pédiatrie"],
+  indications:["Douleur aiguë EVA > 3 (antalgie non et traumatique)","ISR (prémédication analgésique)","Douleur thoracique (SCA)"],
+  dosages:{adulte:"Antalgie : 1 µg/kg dose charge puis titration 0,25–0,5 µg/kg (max 3–4 µg/kg) IV/IN\nISR : 1–2 µg/kg IV",pediatrie:"1 µg/kg puis 0,5 µg/kg (max 3 µg/kg) IV/IN",repetition:"Titration par bolus",doseMax:"Antalgie : max 3–4 µg/kg adulte",voie:"IV, IN",dilution:"Pur (pas de dilution systématique selon HUG BSC)",vitesse:"IVL pour antalgie — bolus ISR"},
+  contreIndications:["Allergie aux opioïdes","Dépression respiratoire sévère non prétraitée"],
+  effetsSecondaires:["Dépression respiratoire","Rigidité thoracique (à fortes doses)","Nausées, vomissements","Hypotension","Bradycardie"],
+  remarques:["Titration prudente si ISRS/IMAO","Peut retarder les antiagrégants oraux (SCA)","Surveiller FR et SpO2 en continu"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.74 — Fentanyl","Algorithmes CORFA 6.0, p.14 — Douleurs thoraciques","Algorithmes CORFA 6.0, p.20 — Antalgie NT","Algorithmes CORFA 6.0, p.28 — Antalgie traumatique"]
+},
+{
+  molecule:"Flumazénil",nomCommercial:"Anexate®",classe:"Antagoniste des benzodiazépines",
+  algorithmes:["Troubles de la conscience","Trouble de la conscience – Pédiatrie"],
+  indications:["Intoxication aux benzodiazépines","Dépression respiratoire d'origine BZD","Réaction paradoxale aux BZD"],
+  dosages:{adulte:"0,2 mg IV en 15 sec, puis 0,1 mg IV toutes les 60 sec — max 1 mg",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"0,1 mg IV/min selon réponse",doseMax:"1 mg",voie:"IV",dilution:"Non précisé",vitesse:"0,2 mg en 15 secondes"},
+  contreIndications:["Suspicion d'intoxication mixte aiguë (tricycliques, cocaïne)","Dépendance aux BZD (risque de sevrage/convulsions)"],
+  effetsSecondaires:["Crise convulsive (notamment si dépendance aux BZD)","Nausées","Agitation"],
+  remarques:["Demi-vie courte (~ 10 min) : risque de ré-sédation — surveiller","Ne pas utiliser si intox aux tricycliques"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.80 — Flumazénil","Algorithmes CORFA 6.0, p.18 — Troubles de la conscience"]
+},
+{
+  molecule:"Furosémide",nomCommercial:"Lasix®",classe:"Diurétique de l'anse",
+  algorithmes:["Détresse respiratoire (OAP)","Troubles respiratoires"],
+  indications:["Œdème aigu du poumon (OAP) avec hypervolémie confirmée"],
+  dosages:{adulte:"20–40 mg IV, dose unique",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"Selon réponse diurétique",doseMax:"Non précisé",voie:"IV",dilution:"Non précisé",vitesse:"IVL — injection lente (risque d'hypotension)"},
+  contreIndications:["TAS < 90 mmHg","Patient âgé, déshydraté, hypovolémique (risque de choc)"],
+  effetsSecondaires:["Hypotension","Déshydratation/hypovolémie","Hypokaliémie","Ototoxicité"],
+  remarques:["Uniquement si patient en hypervolémie confirmée","Rechercher des signes de surcharge avant administration","Ne pas donner si patient déshydraté ou hypovolémique"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.83 — Furosémide","Algorithmes CORFA 6.0, p.11 — Troubles respiratoires"]
+},
+{
+  molecule:"Glucagon",nomCommercial:"GlucaGen®",classe:"Hormone hyperglycémiante",
+  algorithmes:["Troubles de la conscience","Trouble de la conscience – Pédiatrie"],
+  indications:["Hypoglycémie sévère sans accès veineux possible","Intoxication aux bêtabloquants ou anticalciques (adulte)"],
+  dosages:{adulte:"Hypoglycémie : 1 mg SC ou IM\nIntox bêtabloquants/anticalciques : 5–10 mg IV dans G5% sur 15 min",pediatrie:"< 20 kg : 0,5 mg SC/IM | > 20 kg : 1 mg SC/IM\nIntox BB : 0,1 mg/kg IV",repetition:"Non précisé",doseMax:"Non précisé",voie:"SC, IM, IV",dilution:"IV : diluer dans G5%",vitesse:"Intox BB : IV sur 15 min"},
+  contreIndications:["Phéochromocytome","Glucagonome","Non précisé dans les documents CORFA fournis (pour les autres CI)"],
+  effetsSecondaires:["Nausées, vomissements","Hyperglycémie","Tachycardie"],
+  remarques:["Utilisé quand l'accès IV est impossible pour traiter l'hypoglycémie","Moins efficace si glycogène hépatique épuisé (alcoolisme, dénutrition)"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.87 — Glucagon","Algorithmes CORFA 6.0, p.18 — Troubles de la conscience"]
+},
+{
+  molecule:"Glucose",nomCommercial:"Glucose®",classe:"Agent hyperglycémiant",
+  algorithmes:["Troubles de la conscience","Trouble de la conscience – Pédiatrie","Retour à la circulation spontanée","ROSC traumatique"],
+  indications:["Hypoglycémie sévère (glycémie < 4 mmol/L chez le non-diabétique ; < 7 mmol/L chez le diabétique)"],
+  dosages:{adulte:"PO : 16–20 g (4–5 morceaux de sucre)\nIV : 16–20 g IVL sur 1–2 min",pediatrie:"PO/IV/IO : 0,4 g/kg = G20% 2 mL/kg IV",repetition:"Répéter selon contrôle glycémique",doseMax:"Non précisé",voie:"PO, IV, IO",dilution:"G20% ou G40% selon disponibilité",vitesse:"IVL sur 1–2 min (IV adulte)"},
+  contreIndications:["Non précisé dans les documents CORFA fournis (utiliser si glycémie < 4 mmol/L)"],
+  effetsSecondaires:["Hyperglycémie rebond","Phlébite (concentrations élevées en IV périphérique)"],
+  remarques:["Objectif HGT post-administration : 4–6 mmol/L (ROSC)","Si dénutrition/alcoolisme : administrer thiamine AVANT ou en parallèle du glucose"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.91 — Glucose","Algorithmes CORFA 6.0, p.18 — Troubles de la conscience","Algorithmes CORFA 6.0, p.13 — ROSC"]
+},
+{
+  molecule:"Halopéridol",nomCommercial:"Haldol®",classe:"Neuroleptique typique (butyrophénone)",
+  algorithmes:["Présente dans la pharmacologie CORFA, non retrouvée nommément dans les algorithmes fournis"],
+  indications:["Agitation/agressivité grave aiguë associée à des troubles psychiatriques (schizophrénie)","Intoxication alcoolique avec agitation (selon protocoles CHUV/CNP cités)"],
+  dosages:{adulte:"< 64 ans : 5 mg IM | > 64 ans : 2,5 mg IM",pediatrie:"Enfants : 0,5–2 mg IM | Adolescents : 2–5 mg IM (max 6 mg/j si ≤ 40 kg ; max 15 mg/j si > 40 kg)",repetition:"Toutes les 20–30 min si nécessaire (adolescents)",doseMax:"30 mg/jour adulte | 15 mg/j si > 40 kg (pédiatrie)",voie:"IM — Voie IV interdite selon HUG BSC",dilution:"Non applicable (IM)",vitesse:"Non précisé"},
+  contreIndications:["Maladie de Parkinson","QT long","Intoxication aux substances anticholinergiques"],
+  effetsSecondaires:["Allongement du QT — torsades de pointes","Syndrome extrapyramidal","Hypotension"],
+  remarques:["Voie IV interdite selon HUG BSC 2025","Éviter si intoxication anticholinergique suspectée","Association possible avec BZD (protocole agitation)"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.94 — Halopéridol"]
+},
+{
+  molecule:"Héparine non fractionnée (HNF)",nomCommercial:"Héparine Bichsel®, Liquémine®",classe:"Anticoagulant",
+  algorithmes:["Douleurs thoraciques (SCA/STEMI)"],
+  indications:["Syndrome coronarien aigu avec sus-décalage ST (STEMI) — traitement adjuvant"],
+  dosages:{adulte:"5000 UI IV dose unique (= 60 UI/kg, max 5000 UI)",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"Dose unique pré-hospitalière",doseMax:"5000 UI en pré-hospitalier",voie:"IV, SC si VVP impossible",dilution:"Non précisé",vitesse:"Bolus IV"},
+  contreIndications:["Saignement actif","Lésion organique susceptible de saigner","Insuffisance hépatique et rénale grave","Ulcères gastro-intestinaux actifs"],
+  effetsSecondaires:["Saignements, hémorragies","Thrombopénie induite par l'héparine (TIH)","Hyperkaliémie (diabétique)"],
+  remarques:["Ne pas administrer si déjà reçu une dose d'HBPM ou anticoagulant oral","VVP impossible : 5000 UI SC"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.97 — Héparine NF","Algorithmes CORFA 6.0, p.14 — Douleurs thoraciques"]
+},
+{
+  molecule:"Kétamine",nomCommercial:"Kétalar®, Ketamin®",classe:"Analgésique et anesthésique dissociatif",
+  algorithmes:["Antalgie traumatique","Antalgie traumatique – Pédiatrie"],
+  indications:["Douleur aiguë sévère (EVA ≥ 7) en antalgie traumatique","Analgo-sédation pour ISR (hémodynamiquement instable)","Bronchospasme sévère, état de choc"],
+  dosages:{adulte:"Analgésie : 0,5 mg/kg IVL (> 60 sec) puis titration 0,25 mg/kg\nISR : 1–3 mg/kg IVL | IM : 4 mg/kg",pediatrie:"Analgésie IN : 1 mg/kg | IM : 2 mg/kg | IVL : 0,5 mg/kg\nISR : 1–3 mg/kg IVL",repetition:"Titration selon réponse",doseMax:"Non précisé",voie:"IV (lent), IM, IN",dilution:"Non précisé",vitesse:"IVL sur 30–60 secondes minimum"},
+  contreIndications:["Non précisé formellement dans les documents CORFA fournis"],
+  effetsSecondaires:["Phénomènes dissociatifs (hallucinations, rêves)","Hypersécrétion bronchique et salivaire","Tachycardie, HTA","Laryngospasme (rare)","Nausées, vomissements"],
+  remarques:["Associer midazolam pour réduire les phénomènes dissociatifs","Avantage : maintient la pression artérielle — utile en choc","Bronchodilatateur : utile dans l'asthme réfractaire"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.100 — Kétamine","Algorithmes CORFA 6.0, p.28 — Antalgie traumatique","Algorithmes CORFA 6.0, p.45 — Antalgie traumatique Pédiatrie"]
+},
+{
+  molecule:"Kétorolac",nomCommercial:"Tora-dol®",classe:"AINS analgésique",
+  algorithmes:["Antalgie non traumatique","Antalgie NT – Pédiatrie"],
+  indications:["Douleur aiguë modérée à sévère (colique néphrétique, douleur non traumatique)"],
+  dosages:{adulte:"30 mg IVL",pediatrie:"> 2 ans : 0,5–1 mg/kg IVL sur 15 sec (max 30 mg/dose)",repetition:"Toutes les 6–8 h si nécessaire",doseMax:"30 mg/dose adulte ; 120 mg/jour max (adulte)",voie:"IV, IM",dilution:"Non précisé",vitesse:"IVL sur 15 secondes (pédiatrie)"},
+  contreIndications:["Insuffisance rénale","Ulcère gastrique actif ou < 3 mois","3e trimestre grossesse et accouchement","Maladies inflammatoires intestinales (Crohn, colite ulcéreuse)","Insuffisance hépatique sévère","Insuffisance cardiaque sévère","Association avec AAS ou autres AINS"],
+  effetsSecondaires:["Troubles gastro-intestinaux","Insuffisance rénale aiguë","Saignements GI"],
+  remarques:["Durée max d'utilisation : 5 jours","Efficace comme les morphiniques pour la colique néphrétique selon la littérature citée"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.108 — Kétorolac","Algorithmes CORFA 6.0, p.20 — Antalgie NT","Algorithmes CORFA 6.0, p.41 — Antalgie NT Pédiatrie"]
+},
+{
+  molecule:"Labétalol",nomCommercial:"Trandate®",classe:"Alpha et bêta-bloquant",
+  algorithmes:["Déficit neurologique focal (AVC)","Douleurs thoraciques (dissection aortique)","Pré-éclampsie / Éclampsie"],
+  indications:["HTA sévère dans le cadre d'un AVC (TAS > 220 mmHg ou TAD > 120 mmHg)","Dissection aortique","Pré-éclampsie sévère avec HTA > 160/110 mmHg"],
+  dosages:{adulte:"AVC / dissection : 5–10 mg IVL (> 60–120 sec), répétable toutes les 5–10 min — max 100 mg\nPré-éclampsie : 5 mg IVL sur 1 min, répétable toutes les 5 min",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"Toutes les 5–10 min jusqu'à objectif tensionnel",doseMax:"100 mg",voie:"IV (lent)",dilution:"Non précisé",vitesse:"IVL sur 60–120 secondes minimum"},
+  contreIndications:["BAV 2e et 3e degré","Choc cardiogénique","Hypotension marquée ou bradycardie sévère","ATCD asthme ou BPCO"],
+  effetsSecondaires:["Bradycardie","Hypotension orthostatique","Bronchospasme","Nausées, vomissements"],
+  remarques:["Demi-vie d'élimination ~ 4 heures","Surveiller TA de manière rapprochée pendant l'administration"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.112 — Labétalol","Algorithmes CORFA 6.0, p.19 — Déficit neurologique focal","Algorithmes CORFA 6.0, p.49 — Pré-éclampsie/Éclampsie"]
+},
+{
+  molecule:"Lidocaïne",nomCommercial:"Lidocaïne®",classe:"Anti-arythmique (classe Ib)",
+  algorithmes:["ACR non traumatique (alternative à l'amiodarone)","ACR traumatique"],
+  indications:["FV/TV sans pouls — alternative à l'amiodarone lors d'ACR"],
+  dosages:{adulte:"1re dose : 1,0–1,5 mg/kg IV/IO\n2e et 3e dose : 0,5–0,75 mg/kg IV/IO",pediatrie:"1 mg/kg dose unique IV/IO",repetition:"2e et 3e dose possible",doseMax:"Non précisé",voie:"IV, IO",dilution:"Non précisé",vitesse:"Bolus IV/IO"},
+  contreIndications:["Aucune dans le cadre de l'ACR avec FV/TV sans pouls","Hors ACR : BAV, troubles sévères de la conduction, bradycardie, insuff. hépatique, allergie aux anesthésiques locaux de type amide"],
+  effetsSecondaires:["Hypotension","Bradycardie","Arythmies","Convulsions (surdosage)"],
+  remarques:["Utilisée en alternative si amiodarone non disponible lors d'ACR"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.114 — Lidocaïne","Algorithmes CORFA 6.0, p.12 — ACR NT"]
+},
+{
+  molecule:"Lorazépam",nomCommercial:"Temesta®, Rativor®, Sedazin®",classe:"Benzodiazépine — Anxiolytique",
+  algorithmes:["Présente dans la pharmacologie CORFA, non retrouvée nommément dans les algorithmes fournis"],
+  indications:["Anxiété aiguë, agitation, sevrage alcoolique (OH), états d'excitation psychotique"],
+  dosages:{adulte:"2–4 mg IV (0,05 mg/kg) ou 1–2,5 mg PO/SL",pediatrie:"0,1 mg/kg IV/IO max 4 mg",repetition:"Non précisé",doseMax:"Non précisé",voie:"IV, PO, sublingual",dilution:"Non précisé",vitesse:"IVL"},
+  contreIndications:["Insuffisance respiratoire sévère","Insuffisance hépatique sévère","Apnée du sommeil","Myasthénie grave"],
+  effetsSecondaires:["Dépression respiratoire","Sédation","Hypotension","Amnésie antérograde"],
+  remarques:["Peut être administré par voie orodispersible (sublingual) selon HUG BSC"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.116 — Lorazépam"]
+},
+{
+  molecule:"MEOPA",nomCommercial:"MEOPA (Kalinox®, Entonox®)",classe:"Gaz médicinal analgésique (50% O₂ + 50% N₂O)",
+  algorithmes:["Antalgie traumatique","Antalgie traumatique – Pédiatrie"],
+  indications:["Analgésie de courte durée (EVA 3–7) en antalgie traumatique"],
+  dosages:{adulte:"Inhalation à la demande par le patient — système à la demande",pediatrie:"Identique adulte",repetition:"À la demande selon douleur",doseMax:"Non précisé (usage continu limité dans le temps)",voie:"Inhalation",dilution:"Non applicable",vitesse:"Inhalation continue à la demande"},
+  contreIndications:["Grossesse","TCC et HTIC","Occlusion intestinale","Pneumothorax","Embolie gazeuse","Accident de décompression","Opération récente de l'œil ou de l'oreille moyenne"],
+  effetsSecondaires:["Nausées, vomissements","Vertiges","Euphorie","Claustrophobie"],
+  remarques:["Le patient doit tenir lui-même le masque — si le patient ne peut plus tenir le masque, arrêt automatique","Ventilation de la zone obligatoire pendant l'utilisation"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.120 — MEOPA","Algorithmes CORFA 6.0, p.28 — Antalgie traumatique"]
+},
+{
+  molecule:"Méthoxyflurane",nomCommercial:"Penthrox®",classe:"Analgésique par inhalation (halogéné)",
+  algorithmes:["Antalgie traumatique"],
+  indications:["Douleur aiguë traumatique (EVA > 3)"],
+  dosages:{adulte:"3 mL inhalés par intermittence — 1 répétition possible (max 6 mL/48h, max 15 mL/semaine)",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"1 dose supplémentaire de 3 mL si nécessaire",doseMax:"6 mL sur 48h / 15 mL/semaine",voie:"Inhalation",dilution:"Non applicable — verser dans l'inhalateur incliné à 45°",vitesse:"Inhalation par intermittence selon douleur"},
+  contreIndications:["Insuffisance rénale ou hépatique","ATCD d'accident d'anesthésie (hyperthermie maligne)","Grossesse"],
+  effetsSecondaires:["Vertiges","Somnolence","Céphalées"],
+  remarques:["Vérifier que le filtre à charbon est bien connecté","Le filtre réduit l'exposition passive de l'équipe soignante"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.124 — Méthoxyflurane","Algorithmes CORFA 6.0, p.28 — Antalgie traumatique"]
+},
+{
+  molecule:"Méthylprednisolone",nomCommercial:"Solu-Médrol®, Médrol®, Dépo-Médrol®",classe:"Corticoïde — Anti-inflammatoire stéroïdien",
+  algorithmes:["Détresse respiratoire (asthme aigu grave)","Réaction anaphylactique","Trouble respiratoire – Pédiatrie","Réaction anaphylactique – Pédiatrie"],
+  indications:["Asthme aigu grave","Réaction anaphylactique (traitement adjuvant corticoïde)","BPCO exacerbée"],
+  dosages:{adulte:"125 mg IVL (dose standard)\nRéaction allergique : 1–2 mg/kg IV (max 125 mg)\nAsthme/BPCO : 1–2 mg/kg IV",pediatrie:"0,5–2 mg/kg IVL",repetition:"Non précisé",doseMax:"125 mg",voie:"IV (lent)",dilution:"Non précisé",vitesse:"IVL"},
+  contreIndications:["Hypersensibilité","Infections systémiques non traitées (relative)"],
+  effetsSecondaires:["Hyperglycémie","Hypokaliémie","HTA transitoire"],
+  remarques:["Rôle adjuvant dans l'anaphylaxie — ne remplace pas l'adrénaline","Délai d'action de plusieurs heures pour l'effet anti-inflammatoire"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.128 — Méthylprednisolone","Algorithmes CORFA 6.0, p.11 — Troubles respiratoires","Algorithmes CORFA 6.0, p.17 — Réaction anaphylactique"]
+},
+{
+  molecule:"Midazolam",nomCommercial:"Dormicum®, Buccolam®",classe:"Benzodiazépine — Sédatif / Anticonvulsivant",
+  algorithmes:["Antalgie traumatique","Antalgie traumatique – Pédiatrie","Troubles du rythme (sédation cardioversion)","Troubles de la conscience"],
+  indications:["Analgo-sédation vigile (avant geste douloureux)","Convulsions persistantes","Sédation pour cardioversion électrique"],
+  dosages:{adulte:"Analgo-sédation : 1–2 mg IVL (max 7,5 mg)\nConvulsions : 1 mg IV ou 5 mg IN/IM",pediatrie:"Analgo-sédation : 0,05–0,1 mg/kg (max 2 mg)\nConvulsions : 0,2 mg/kg IM ou IN (max 10 mg)\nDose fixe : 13–40 kg → 5 mg IM | > 40 kg → 10 mg IM",repetition:"Selon réponse clinique",doseMax:"7,5 mg (analgo-sédation adulte) | 10 mg (convulsions)",voie:"IV (lent), IM, IN",dilution:"Non précisé",vitesse:"IVL"},
+  contreIndications:["Aucune contre-indication absolue en urgence (selon CORFA)"],
+  effetsSecondaires:["Dépression respiratoire","Sédation excessive","Hypotension","Amnésie antérograde"],
+  remarques:["Surveiller FR et SpO2 en continu","Synergique avec les opioïdes — potentialisation de la dépression respiratoire"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.132 — Midazolam","Algorithmes CORFA 6.0, p.28 — Antalgie traumatique","Algorithmes CORFA 6.0, p.15 — Troubles du rythme"]
+},
+{
+  molecule:"Morphine",nomCommercial:"Morphine®, MST Continus®",classe:"Opioïde analgésique naturel",
+  algorithmes:["Douleurs thoraciques","Antalgie non traumatique","Antalgie traumatique","Détresse respiratoire (OAP)"],
+  indications:["Douleur aiguë modérée à sévère (EVA > 3)","Douleur thoracique (SCA)","OAP (réduction de la précharge)"],
+  dosages:{adulte:"0,1 mg/kg puis 0,05 mg/kg (max 0,2 mg/kg) IV/IN\nDRS (SCA) : titration 1–2 mg IV (max 5–10 mg)",pediatrie:"0,04 mg/kg puis 0,02 mg/kg (max 0,1 mg/kg) IV/IN",repetition:"Titration par bolus",doseMax:"0,2 mg/kg adulte",voie:"IV, IN",dilution:"Non précisé",vitesse:"IVL — titration lente"},
+  contreIndications:["Insuffisance respiratoire sévère non assistée","Hypotension","Allergie aux opioïdes"],
+  effetsSecondaires:["Dépression respiratoire","Nausées, vomissements","Constipation","Hypotension","Prurit"],
+  remarques:["Surveiller FR, SpO2 et TA en continu","Naloxone disponible comme antidote","Utilisation prudente si SpO2 < 90% ou FR < 12/min"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.137 — Morphine","Algorithmes CORFA 6.0, p.14 — Douleurs thoraciques","Algorithmes CORFA 6.0, p.20 — Antalgie NT","Algorithmes CORFA 6.0, p.28 — Antalgie traumatique"]
+},
+{
+  molecule:"Naloxone",nomCommercial:"Narcan®, Nyxoid®",classe:"Antagoniste des opioïdes",
+  algorithmes:["Troubles de la conscience","Trouble de la conscience – Pédiatrie"],
+  indications:["Intoxication aux opioïdes avec dépression respiratoire (FR < 8/min)"],
+  dosages:{adulte:"Dépendance aux opioïdes : 0,1 mg IV bolus toutes les 2–3 min (objectif FR > 8/min)\nSi pas IV : 0,4 mg IM/IN toutes les 3–5 min (max 10 mg)\nIntox thérapeutique : 0,04 mg IV (titration douce)",pediatrie:"< 20 kg / < 5 ans : 0,1 mg/kg IV/IN/IM\n> 20 kg / > 5 ans : 2 mg IV/IN/IM",repetition:"Toutes les 2–3 min IV selon réponse",doseMax:"10 mg (considérer autre cause si sans effet)",voie:"IV, IM, IN",dilution:"Non précisé",vitesse:"Bolus IV"},
+  contreIndications:["Non précisé dans les documents CORFA fournis"],
+  effetsSecondaires:["Syndrome de sevrage aigu aux opioïdes (agitation, tachycardie, HTA, convulsions)","Vomissements","Recurrence dépression respiratoire (demi-vie courte)"],
+  remarques:["Demi-vie courte : risque de ré-narcotisation — surveiller en continu","Objectif : FR > 8/min, pas de réveil complet chez le patient dépendant (risque de sevrage)"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.141 — Naloxone","Algorithmes CORFA 6.0, p.18 — Troubles de la conscience"]
+},
+{
+  molecule:"Nitroglycérine",nomCommercial:"Isoket® spray, Nitroglycerin Streuli® cp, Perlinganit® IV",classe:"Vasodilatateur / Dérivé nitré",
+  algorithmes:["Douleurs thoraciques","Détresse respiratoire (OAP)"],
+  indications:["Angor stable/instable, SCA (symptomatique)","OAP (si TAS > 140 mmHg)"],
+  dosages:{adulte:"Angor : 1,25 mg (1 push Isoket) ou 0,8 mg (1 cp) toutes les 3–5 min si TAS > 90 mmHg — max 3 cp/push\nOAP : 1 push/cp toutes les 3–5 min si TAS > 140 mmHg",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"Toutes les 3–5 min selon TAS",doseMax:"3 comprimés ou 2 pushs (angor)",voie:"Sublingual (spray ou cp), IV (pousse-seringue)",dilution:"IV : Perlinganit® (10 mg/10 mL ou 50 mg/50 mL)",vitesse:"Sublingual immédiat — IV : débit titré"},
+  contreIndications:["État de choc et hypotension (absolue)","Prise d'inhibiteurs PDE-5 (sildénafil-Viagra®, tadalafil-Cialis®, vardénafil-Levitra® ou tout « -afil »)"],
+  effetsSecondaires:["Céphalées","Hypotension","Tachycardie réflexe","Vertiges"],
+  remarques:["Toujours vérifier la TAS avant chaque administration","Établir un accès veineux avant l'administration selon le document"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.145 — Nitroglycérine","Algorithmes CORFA 6.0, p.14 — Douleurs thoraciques","Algorithmes CORFA 6.0, p.11 — Troubles respiratoires (OAP)"]
+},
+{
+  molecule:"Noradrénaline",nomCommercial:"Noradrénaline Sintetica®",classe:"Amine sympathicomimétique alpha-adrénergique",
+  algorithmes:["État de choc non traumatique","Retour à la circulation spontanée (ROSC)","ROSC traumatique","État de choc NT/T – Pédiatrie","Traumatisme médullaire"],
+  indications:["État de choc résistant au remplissage vasculaire (septique, neurogénique)","Maintien de la TA après ROSC"],
+  dosages:{adulte:"0,1–0,3 µg/kg/min en pousse-seringue (titration — départ 0,05–0,1 µg/kg/min)",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"Perfusion continue — adapter le débit selon réponse",doseMax:"Non précisé (jusqu'à 30 µg/min selon Brévimed cité)",voie:"IV (pousse-seringue exclusivement)",dilution:"Noradrénaline Sintetica® 0,1 mg/mL (100 µg/mL) — solution prête",vitesse:"Débit continu en pousse-seringue — ne jamais flusher"},
+  contreIndications:["Hypovolémie non corrigée (traiter d'abord le remplissage)"],
+  effetsSecondaires:["Tachycardie, arythmies","Hypertension","Ischémie périphérique","Céphalées, tremblements","Œdème pulmonaire"],
+  remarques:["Administration uniquement par pousse-seringue avec débit continu","Ne jamais flusher la voie — ne jamais mélanger avec d'autres médicaments sur la même voie","Surveillance TA rapprochée"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.149 — Noradrénaline","Algorithmes CORFA 6.0, p.16 — État de choc NT","Algorithmes CORFA 6.0, p.13 — ROSC"]
+},
+{
+  molecule:"Ocytocine",nomCommercial:"Syntocinon®",classe:"Hormone hypophysaire — Utérocontractant",
+  algorithmes:["Accouchement physiologique","Accouchement pathologique","Hémorragie post-partum primaire"],
+  indications:["Prévention et traitement de l'atonie utérine et des hémorragies post-partum","Délivrance placentaire"],
+  dosages:{adulte:"5 UI dans 100 mL NaCl 0.9% IVL sur 5 min — OU — 5 UI IM\nÀ répéter si hémorragie post-partum primaire",pediatrie:"Non applicable",repetition:"Répétable selon les saignements",doseMax:"Non précisé",voie:"IV (lent), IM",dilution:"5 UI dans 100 mL NaCl 0.9% (concentration = 0,05 UI/mL)",vitesse:"IVL sur 5 minutes"},
+  contreIndications:["Non précisé dans les documents CORFA fournis"],
+  effetsSecondaires:["Tachycardie (effet noté dans HUG BSC)","Hypotension","Nausées"],
+  remarques:["Induit une tachycardie — surveiller la FC","Administrer après la naissance du bébé — pas avant"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.153 — Ocytocine","Algorithmes CORFA 6.0, p.46 — Accouchement","Algorithmes CORFA 6.0, p.51 — Hémorragie post-partum"]
+},
+{
+  molecule:"Olanzapine",nomCommercial:"Zyprexa®, Olanpax®",classe:"Neuroleptique atypique (2e génération)",
+  algorithmes:["Présente dans la pharmacologie CORFA, non retrouvée nommément dans les algorithmes fournis"],
+  indications:["Agitation/agressivité grave aiguë associée à des troubles psychiatriques (schizophrénie, trouble bipolaire)"],
+  dosages:{adulte:"10 mg PO SL (comprimé orodispersible)\nIM : 5–10 mg (selon UpToDate cité)\nMax : 30 mg/jour PO ou 20 mg/jour PO (orodispersible)",pediatrie:"Données limitées en pédiatrie selon les documents CORFA fournis",repetition:"Non précisé",doseMax:"30 mg/jour (IM) | 20 mg/jour (PO orodispersible)",voie:"PO sublingual, IM",dilution:"Non applicable",vitesse:"Non précisé"},
+  contreIndications:["Intoxication aux substances anticholinergiques"],
+  effetsSecondaires:["Somnolence","Hypotension orthostatique","Allongement du QT (moindre qu'halopéridol)","Syndrome métabolique (usage chronique)"],
+  remarques:["Éviter si intox anticholinergique suspectée","Privilégier la voie PO si possible"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.160 — Olanzapine"]
+},
+{
+  molecule:"Ondansétron",nomCommercial:"Zofran®, Ondansétron®",classe:"Antagoniste 5-HT3 — Antiémétique",
+  algorithmes:["Présente dans la pharmacologie CORFA (algorithme nausées/vomissements mentionné), non extrait des pages d'algorithmes disponibles"],
+  indications:["Nausées et vomissements"],
+  dosages:{adulte:"4 mg IVL sur 2–5 min, dose unique (max 8 mg)",pediatrie:"0,1 mg/kg IVL sur 2–5 min",repetition:"Dose unique",doseMax:"8 mg adulte",voie:"IV (lent), IM, PO",dilution:"Non précisé",vitesse:"IVL sur 2–5 minutes"},
+  contreIndications:["Hypersensibilité à l'ondansétron ou autres antagonistes 5-HT3","QT long acquis ou congénital"],
+  effetsSecondaires:["Allongement léger de l'intervalle QT","Céphalées","Constipation"],
+  remarques:["Attention aux associations avec d'autres médicaments allongeant le QT","Surveiller l'ECG si co-médication à risque QT"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.156 — Ondansétron"]
+},
+{
+  molecule:"Paracétamol",nomCommercial:"Dafalgan®, Acétalgine®, Panadol®, Perfalgan®",classe:"Antipyrétique — Analgésique (palier 1 OMS)",
+  algorithmes:["Antalgie non traumatique","Antalgie traumatique","Antalgie NT – Pédiatrie","Antalgie traumatique – Pédiatrie","Trouble de la conscience – Pédiatrie (fièvre)"],
+  indications:["Douleur d'intensité légère à modérée (EVA 3–6)","Fièvre","Traitement complémentaire antalgie"],
+  dosages:{adulte:"> 50 kg : 1 g IVL sur 10–15 min ou PO (max 4 g/jour)\n< 50 kg : 15 mg/kg IV toutes les 6 h",pediatrie:"IV/PO : 15 mg/kg toutes les 6 h\nIR : < 5 kg : 80 mg | < 12 kg : 125 mg | > 12 kg : 250 mg | > 30 kg : 500 mg",repetition:"Toutes les 6 h (ou 4 h selon UpToDate cité)",doseMax:"4 g/jour adulte | 75 mg/kg/j (max 3750 mg/j) si ≥ 2 ans ≥ 50 kg",voie:"IV (lent), PO, IR (rectal)",dilution:"IV : solution prête (1 g/100 mL)",vitesse:"IVL sur 10–15 minutes"},
+  contreIndications:["Insuffisance hépatique sévère","Allergie au paracétamol"],
+  effetsSecondaires:["Hépatotoxicité en cas de surdosage","Réactions cutanées (rares)"],
+  remarques:["Ne pas dépasser 4 g/jour chez l'adulte","Administrer même si EVA modéré — antalgie multimodale"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.163 — Paracétamol","Algorithmes CORFA 6.0, p.20 — Antalgie NT","Algorithmes CORFA 6.0, p.28 — Antalgie traumatique","Algorithmes CORFA 6.0, p.41 — Antalgie NT Pédiatrie"]
+},
+{
+  molecule:"Prasugrel",nomCommercial:"Efient®",classe:"Antiagrégant plaquettaire (thiénopyridine)",
+  algorithmes:["Douleurs thoraciques (douleurs rétrosternales — STEMI)"],
+  indications:["SCA avec sus-décalage ST (STEMI) — alternative au clopidogrel si indiqué par protocole local"],
+  dosages:{adulte:"60 mg PO dose de charge unique",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"Dose unique",doseMax:"60 mg",voie:"PO",dilution:"Non applicable",vitesse:"Non précisé"},
+  contreIndications:["Saignements pathologiques aigus","ATCD d'AVC ou AIT","Insuffisance hépatique grave (Child-Pugh C)","Hypersensibilité"],
+  effetsSecondaires:["Hémorragie (incidence globale saignements fatals ~ 1,3% dans étude TRITON)","Anémie"],
+  remarques:["Association avec AAS selon algorithme douleurs thoraciques"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.170 — Prasugrel","Algorithmes CORFA 6.0, p.14 — Douleurs thoraciques"]
+},
+{
+  molecule:"Propofol",nomCommercial:"Disoprivan®, Propofol®",classe:"Anesthésique général — Hypnotique inducteur",
+  algorithmes:["Gestion des voies aériennes et de la ventilation (ISR/sédation)"],
+  indications:["Induction anesthésique (ISR)","Sédation de courte durée","État de mal épileptique réfractaire"],
+  dosages:{adulte:"Induction : 1–3 mg/kg IV\nEntretien sédation : 4–10 mg/kg/h en pousse-seringue",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"Entretien en pousse-seringue",doseMax:"Non précisé",voie:"IV",dilution:"Non précisé",vitesse:"Injection IV directe pour induction"},
+  contreIndications:["Allergie à l'huile de soja ou aux phosphatides d'œuf (contenu dans la formulation émulsion)"],
+  effetsSecondaires:["Hypotension","Dépression respiratoire","Apnée","Douleur à l'injection","Bradycardie"],
+  remarques:["Pas d'effet analgésique — associer fentanyl ou kétamine","Hypotension fréquente à l'induction — préparer les catécholamines"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.173 — Propofol"]
+},
+{
+  molecule:"Rocuronium",nomCommercial:"Esmeron®",classe:"Curare non dépolarisant",
+  algorithmes:["Gestion des voies aériennes et de la ventilation (ISR)"],
+  indications:["Intubation en séquence rapide (ISR) — si contre-indication au suxaméthonium","Entretien de la relaxation neuromusculaire"],
+  dosages:{adulte:"ISR : 1 mg/kg IV\nEntretien anesthésie : 0,3 mg/kg IV",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"Entretien selon besoins",doseMax:"Non précisé",voie:"IV",dilution:"Non précisé",vitesse:"Bolus IV pour ISR — délai d'action ~ 60 sec"},
+  contreIndications:["Hypersensibilité au rocuronium"],
+  effetsSecondaires:["Blocage neuromusculaire prolongé","Réactions anaphylactiques (rares)"],
+  remarques:["Reversible par sugammadex (si disponible)","Utilisé si contre-indication à la succinylcholine"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.176 — Rocuronium"]
+},
+{
+  molecule:"Salbutamol",nomCommercial:"Ventolin®, Salamol®",classe:"β₂-sympathomimétique à courte durée d'action (SABA)",
+  algorithmes:["Détresse respiratoire (asthme, BPCO)","Trouble respiratoire – Pédiatrie"],
+  indications:["Crise d'asthme","BPCO exacerbée avec bronchospasme","Sibilances"],
+  dosages:{adulte:"Nébulisation : 5 mg ad 5 mL NaCl 0.9%\nAérosol-doseur : 2–4 push (200–400 µg) avec chambre d'inhalation",pediatrie:"Nébulisation : < 5 ans : 2,5 mg | > 5 ans : 5 mg ad 5 mL NaCl 0.9%\nAérosol-doseur : < 6 ans : 6 pushs à répéter aux 20 min",repetition:"Répétable selon réponse clinique",doseMax:"Non précisé",voie:"Nébulisation, inhalation (aérosol-doseur)",dilution:"Nébulisation : ad 5 mL NaCl 0.9%",vitesse:"Nébulisation continue"},
+  contreIndications:["Non précisé dans les documents CORFA fournis"],
+  effetsSecondaires:["Tachycardie","Tremblements","Hypokaliémie","Céphalées"],
+  remarques:["Nébulisation à l'air (non pur O2 selon CORFA pour BPCO)","En BPCO : titration SpO2 ~ 90%"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.179 — Salbutamol","Algorithmes CORFA 6.0, p.11 — Troubles respiratoires","Algorithmes CORFA 6.0, p.34 — Trouble respiratoire Pédiatrie"]
+},
+{
+  molecule:"Salbutamol + Bromure d'Ipratropium",nomCommercial:"Dospir® (combiné), Ventolin® + Atrovent®",classe:"β₂-mimétique + Anticholinergique bronchodilatateur",
+  algorithmes:["Détresse respiratoire (BPCO exacerbée)"],
+  indications:["BPCO exacerbée avec bronchospasme — association β₂-mimétique + parasympatholytique"],
+  dosages:{adulte:"1 monodose Dospir (0,5 mg ipratropium + 2,5 mg salbutamol) + 2 monodoses Ventolin (2×1,25 mg salbutamol) en nébulisation",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"Répétable selon réponse clinique",doseMax:"Non précisé",voie:"Nébulisation",dilution:"Solution pour inhalation prête à l'emploi",vitesse:"Nébulisation continue"},
+  contreIndications:["Tachycardie (relative pour l'ipratropium)","Glaucome à angle fermé (ne pas vaporiser dans les yeux)"],
+  effetsSecondaires:["Tachycardie","Sécheresse buccale","Tremblements","Céphalées"],
+  remarques:["Association indiquée pour la BPCO selon algorithme troubles respiratoires"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.183 — Salbutamol + Ipratropium","Algorithmes CORFA 6.0, p.11 — Troubles respiratoires"]
+},
+{
+  molecule:"Sulfate de Magnésium (MgSO₄)",nomCommercial:"Sulfate de Magnésium®",classe:"Anti-arythmique / Anticonvulsivant",
+  algorithmes:["ACR non traumatique (torsades de pointe)","Détresse respiratoire (asthme aigu grave)","Pré-éclampsie / Éclampsie"],
+  indications:["Torsades de pointe (ACR ou hémodynamiquement instable)","Asthme aigu grave réfractaire aux β₂-mimétiques","Pré-éclampsie sévère / Éclampsie (prévention et traitement des convulsions)"],
+  dosages:{adulte:"ACR / torsades : 2 g IVL/IO sur 5 min\nAsthme aigu : 2 g dans 100 mL NaCl 0.9% IVL sur 15–20 min\nPré-éclampsie sévère : 4 g dans 100 mL NaCl 0.9% IVL/IO lent sur ≥ 15 min\nÉclampsie : 4 g dans 100 mL NaCl 0.9% IVL sur 5–10 min (4–6 gouttes/sec)",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"Éclampsie : 2 g IVL supplémentaires si convulsions persistantes",doseMax:"Non précisé",voie:"IV, IO",dilution:"Diluer dans 100 mL NaCl 0.9% ou G5%",vitesse:"Selon indication (voir dosages) — jamais en IV rapide"},
+  contreIndications:["BAV","Myasthénie grave","Prise simultanée de barbituriques, narcotiques ou hypnotiques (risque dépression respiratoire)"],
+  effetsSecondaires:["Bradycardie, anomalies de conduction","Hypotension si injection trop rapide","Sensation de chaleur, flush","Céphalées, vertiges","Nausées, vomissements"],
+  remarques:["Ne jamais injecter en IV rapide — risque d'hypotension et bradycardie graves","Antidote : gluconate de calcium (si disponible)"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.186 — Sulfate de Magnésium","Algorithmes CORFA 6.0, p.12 — ACR NT","Algorithmes CORFA 6.0, p.49 — Pré-éclampsie/Éclampsie"]
+},
+{
+  molecule:"Suxaméthonium (Succinylcholine)",nomCommercial:"Succinolin®",classe:"Curare dépolarisant à courte durée d'action",
+  algorithmes:["Gestion des voies aériennes et de la ventilation (ISR)"],
+  indications:["Intubation en séquence rapide (ISR) — agent de choix pour la curarisation rapide"],
+  dosages:{adulte:"100 mg IV pur (1,0–1,5 mg/kg)",pediatrie:"1–1,5 mg/kg IV",repetition:"Maximum 2 bolus itératifs (risque de bloc de phase II)",doseMax:"Non précisé",voie:"IV direct (pur)",dilution:"Ne pas diluer",vitesse:"Bolus IV direct — action en ~ 30 sec, durée ~ 8–10 min"},
+  contreIndications:["Brûlures du 10e au 60e jour","Para/tétraplégie entre 24h et 6 mois post-lésion","Alitement prolongé > 10 jours","Crush syndrome","Insuffisance rénale (prudence — augmente la kaliémie de 1 mmol/L)"],
+  effetsSecondaires:["Hyperkaliémie (↑K+ de 1 mmol/L)","Bradycardie","Fasciculations musculaires","Hyperthermie maligne (rare)"],
+  remarques:["Augmente la kaliémie — prudence en insuff. rénale","Max 2 bolus (risque bloc de phase II)","Alternative : rocuronium 1 mg/kg si CI"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.190 — Suxaméthonium","Algorithmes CORFA 6.0, p.10 — Gestion VA/Ventilation"]
+},
+{
+  molecule:"Thiamine",nomCommercial:"Benerva®",classe:"Vitamine B1 (hydrosoluble)",
+  algorithmes:["Troubles de la conscience"],
+  indications:["Hypoglycémie avec contexte de malnutrition ou alcoolisme chronique","Suspicion d'encéphalopathie de Wernicke"],
+  dosages:{adulte:"100 mg IV (suspicion hypovitaminose : 200 mg IV selon HUG BSC)\nMax : 6 g",pediatrie:"Non précisé dans les documents CORFA fournis",repetition:"Non précisé",doseMax:"6 g",voie:"IV",dilution:"Non précisé",vitesse:"Non précisé"},
+  contreIndications:["Non précisé dans les documents CORFA fournis"],
+  effetsSecondaires:["Réactions anaphylactiques (rares)"],
+  remarques:["À administrer AVANT ou en même temps que le glucose chez les patients avec suspicion de dénutrition/alcoolisme — risque d'encéphalopathie de Wernicke si glucose seul administré en premier"],
+  sources:["Pharmacologie CORFA 2025 v4.0, p.193 — Thiamine","Algorithmes CORFA 6.0, p.18 — Troubles de la conscience"]
+}
+];
+/* =============================================
+   NAVIGATION
+============================================= */
+function switchTab(name){
+  document.querySelectorAll('.module').forEach(m=>m.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('module-'+name).classList.add('active');
+  const tabId = name==='ventilation'?'vent':name==='perfusion'?'perf':'corf';
+  document.getElementById('tab-'+tabId).classList.add('active');
+}
+
+/* =============================================
+   VENTILATION
+============================================= */
+let ventTimer=null,ventStartTime=null,ventElapsed=0,ventCount=0,ventRunning=false,signalTimeout=null,wakeLock=null,audioCtx=null;
+const CYCLE_MS=6000,SIGNAL_MS=600;
+
+function initAudio(){
+  if(!audioCtx){try{audioCtx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}
+  if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
+}
+function playBip(){
+  if(!audioCtx)return;
+  try{
+    const t=audioCtx.currentTime;
+    // Double bip court : BIP-BIP — reconnaissable, perçant, mémorisable
+    // BIP 1 : 1100 Hz — court et tranchant
+    const tone1=ctx=>{ const o=ctx.createOscillator(),g=ctx.createGain(); o.connect(g);g.connect(ctx.destination); o.type='square'; o.frequency.setValueAtTime(1100,t); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(1.0,t+0.01); g.gain.setValueAtTime(1.0,t+0.08); g.gain.exponentialRampToValueAtTime(0.001,t+0.15); o.start(t);o.stop(t+0.15); };
+    // BIP 2 : 880 Hz — légèrement plus bas, 0.18 s après
+    const tone2=ctx=>{ const o=ctx.createOscillator(),g=ctx.createGain(); o.connect(g);g.connect(ctx.destination); o.type='square'; o.frequency.setValueAtTime(880,t+0.18); g.gain.setValueAtTime(0,t+0.18); g.gain.linearRampToValueAtTime(1.0,t+0.19); g.gain.setValueAtTime(1.0,t+0.26); g.gain.exponentialRampToValueAtTime(0.001,t+0.33); o.start(t+0.18);o.stop(t+0.33); };
+    // Compresseur dynamique pour éviter la saturation et maximiser la puissance perçue
+    const comp=audioCtx.createDynamicsCompressor();comp.threshold.value=-6;comp.knee.value=3;comp.ratio.value=6;comp.attack.value=0;comp.release.value=0.1;comp.connect(audioCtx.destination);
+    const o1=audioCtx.createOscillator(),g1=audioCtx.createGain();
+    o1.connect(g1);g1.connect(comp);o1.type='square';o1.frequency.setValueAtTime(1100,t);
+    g1.gain.setValueAtTime(0,t);g1.gain.linearRampToValueAtTime(1.0,t+0.01);g1.gain.setValueAtTime(1.0,t+0.08);g1.gain.exponentialRampToValueAtTime(0.001,t+0.15);
+    o1.start(t);o1.stop(t+0.16);
+    const o2=audioCtx.createOscillator(),g2=audioCtx.createGain();
+    o2.connect(g2);g2.connect(comp);o2.type='square';o2.frequency.setValueAtTime(880,t+0.18);
+    g2.gain.setValueAtTime(0,t+0.18);g2.gain.linearRampToValueAtTime(1.0,t+0.19);g2.gain.setValueAtTime(1.0,t+0.26);g2.gain.exponentialRampToValueAtTime(0.001,t+0.34);
+    o2.start(t+0.18);o2.stop(t+0.35);
+  }catch(e){}
+}
+function showVentSignal(){
+  const card=document.getElementById('chronoCard'),signal=document.getElementById('ventSignal');
+  card.classList.add('flash');signal.classList.add('show');
+  clearTimeout(signalTimeout);
+  signalTimeout=setTimeout(()=>{card.classList.remove('flash');signal.classList.remove('show');},SIGNAL_MS);
+}
+function formatTime(ms){
+  const s=Math.floor(ms/1000),m=Math.floor(s/60).toString().padStart(2,'0'),sec=(s%60).toString().padStart(2,'0');
+  return m+':'+sec;
+}
+function ventLoop(){
+  if(!ventRunning)return;
+  const now=Date.now(),elapsed=ventElapsed+(now-ventStartTime);
+  document.getElementById('chronoDisplay').textContent=formatTime(elapsed);
+  document.getElementById('progressBar').style.width=((elapsed%CYCLE_MS)/CYCLE_MS*100)+'%';
+  const expected=Math.floor(elapsed/CYCLE_MS);
+  if(expected>ventCount){ventCount=expected;document.getElementById('ventCount').textContent=ventCount;playBip();showVentSignal();}
+  ventTimer=requestAnimationFrame(ventLoop);
+}
+function ventStart(){
+  initAudio();if(ventRunning)return;ventRunning=true;ventStartTime=Date.now();
+  ventTimer=requestAnimationFrame(ventLoop);
+  document.getElementById('btnStart').disabled=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnReset').disabled=false;
+  requestWakeLock();
+}
+function ventPause(){
+  if(!ventRunning)return;ventRunning=false;ventElapsed+=Date.now()-ventStartTime;cancelAnimationFrame(ventTimer);
+  document.getElementById('btnStart').disabled=false;document.getElementById('btnStart').textContent='▶ Reprendre';
+  document.getElementById('btnPause').disabled=true;releaseWakeLock();
+}
+function ventReset(){
+  ventRunning=false;cancelAnimationFrame(ventTimer);clearTimeout(signalTimeout);
+  ventElapsed=0;ventCount=0;ventStartTime=null;
+  document.getElementById('chronoDisplay').textContent='00:00';
+  document.getElementById('ventCount').textContent='0';
+  document.getElementById('progressBar').style.width='0%';
+  document.getElementById('chronoCard').classList.remove('flash');
+  document.getElementById('ventSignal').classList.remove('show');
+  document.getElementById('btnStart').disabled=false;document.getElementById('btnStart').textContent='▶ Démarrer';
+  document.getElementById('btnPause').disabled=true;document.getElementById('btnReset').disabled=true;
+  releaseWakeLock();
+}
+async function requestWakeLock(){
+  const el=document.getElementById('wakeLockStatus');
+  if('wakeLock' in navigator){try{wakeLock=await navigator.wakeLock.request('screen');el.textContent='🔆 Écran maintenu actif';wakeLock.addEventListener('release',()=>el.textContent='🔅 Verrou libéré');}catch(e){el.textContent='⚠️ Écran non maintenu actif';}}
+  else el.textContent='⚠️ Wake Lock non supporté';
+}
+async function releaseWakeLock(){if(wakeLock){try{await wakeLock.release();}catch(e){}wakeLock=null;document.getElementById('wakeLockStatus').textContent='';}}
+document.addEventListener('visibilitychange',async()=>{if(ventRunning&&document.visibilityState==='visible')await requestWakeLock();});
+
+/* =============================================
+   PERFUSION
+============================================= */
+function onFactorChange(){document.getElementById('customFactorGroup').style.display=document.getElementById('inputFactor').value==='custom'?'block':'none';}
+function getEffectiveFactor(){const s=document.getElementById('inputFactor');return s.value==='custom'?parseFloat(document.getElementById('inputCustomFactor').value):parseFloat(s.value);}
+function perfCalculate(){
+  const errEl=document.getElementById('perfError'),resEl=document.getElementById('perfResults');
+  errEl.classList.remove('show');resEl.classList.remove('show');errEl.textContent='';
+  const vol=parseFloat(document.getElementById('inputVolume').value),t=parseFloat(document.getElementById('inputTime').value),f=getEffectiveFactor();
+  const errs=[];
+  if(isNaN(vol)||vol<=0)errs.push('Le volume doit être un nombre positif (ml).');
+  if(isNaN(t)||t<=0)errs.push('La durée doit être un nombre positif (minutes).');
+  if(isNaN(f)||f<=0)errs.push('Le facteur de gouttes doit être un nombre positif.');
+  if(errs.length){errEl.innerHTML='⚠️ '+errs.join('<br>⚠️ ');errEl.classList.add('show');return;}
+  const totalDrops=vol*f,durationSec=t*60,gps=totalDrops/durationSec,gpm=gps*60;
+  const gpsR=Math.round(gps*10)/10,gpsP=Math.round(gps);
+  document.getElementById('resMain').textContent=gpsR.toFixed(1);
+  document.getElementById('resGPM').textContent=Math.round(gpm);
+  document.getElementById('resTotalG').textContent=Math.round(totalDrops);
+  document.getElementById('resPhraseEl').innerHTML='Réglez environ <strong>'+gpsR.toFixed(1)+'</strong> goutte'+(gpsR>1?'s':'')+'/sec<br><small>En pratique : ≈ '+gpsP+' goutte'+(gpsP>1?'s':'')+'/sec</small>';
+  resEl.classList.add('show');resEl.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+/* =============================================
+   CORFA — initialisation
+============================================= */
+// Extraire tous les algos et classes uniques pour les filtres
+const allAlgos=[...new Set(corfaMedicaments.flatMap(m=>m.algorithmes))].sort();
+const allClasses=[...new Set(corfaMedicaments.map(m=>m.classe))].sort();
+
+function initCorfaFilters(){
+  const sa=document.getElementById('filterAlgo'),sc=document.getElementById('filterClasse');
+  allAlgos.forEach(a=>{const o=document.createElement('option');o.value=a;o.textContent=a.length>45?a.slice(0,45)+'…':a;sa.appendChild(o);});
+  allClasses.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sc.appendChild(o);});
+}
+
+function routeBadges(voie){
+  if(!voie)return '';
+  const map={IV:'badge-iv',IM:'badge-im',IN:'badge-in',PO:'badge-po',SC:'badge-sc',IO:'badge-io',IR:'badge-ir',Inhalation:'badge-inh',inhalation:'badge-inh',Nébulisation:'badge-inh',nébulisation:'badge-inh',sublingual:'badge-po',SL:'badge-po'};
+  const detected=[];
+  Object.entries(map).forEach(([k,cls])=>{if(voie.toLowerCase().includes(k.toLowerCase())&&!detected.includes(cls))detected.push({k,cls});});
+  return detected.map(({k,cls})=>`<span class="badge-route ${cls}">${k}</span>`).join('');
+}
+
+function renderMolList(list){
+  const container=document.getElementById('molList'),nr=document.getElementById('noResults'),cnt=document.getElementById('corfaCount');
+  container.innerHTML='';
+  if(list.length===0){nr.style.display='block';cnt.textContent='0 molécule';return;}
+  nr.style.display='none';cnt.textContent=list.length+' molécule'+(list.length>1?'s':'');
+  list.forEach((m,idx)=>{
+    const div=document.createElement('div');div.className='mol-item';div.setAttribute('data-idx',idx);
+    div.innerHTML=`<div class="mol-item-name">${m.molecule}</div><div class="mol-item-sub">${m.nomCommercial||''} — ${m.classe||''}</div><div class="mol-item-badges">${routeBadges(m.dosages.voie)}</div>`;
+    div.addEventListener('click',()=>openFiche(m));
+    container.appendChild(div);
+  });
+}
+
+function corfaFilter(){
+  const q=document.getElementById('corfaSearch').value.toLowerCase().trim();
+  const algo=document.getElementById('filterAlgo').value;
+  const classe=document.getElementById('filterClasse').value;
+  let list=[...corfaMedicaments].sort((a,b)=>a.molecule.localeCompare(b.molecule,'fr'));
+  if(q)list=list.filter(m=>m.molecule.toLowerCase().includes(q)||m.nomCommercial.toLowerCase().includes(q)||(m.classe&&m.classe.toLowerCase().includes(q)));
+  if(algo)list=list.filter(m=>m.algorithmes.some(a=>a===algo));
+  if(classe)list=list.filter(m=>m.classe===classe);
+  renderMolList(list);
+}
+
+function corfaShowAll(){
+  document.getElementById('corfaSearch').value='';
+  document.getElementById('filterAlgo').value='';
+  document.getElementById('filterClasse').value='';
+  corfaFilter();
+}
+
+function openFiche(m){
+  document.getElementById('corfaListView').style.display='none';
+  const fv=document.getElementById('ficheView');fv.classList.add('show');
+  const dosStr=(label,val)=>val&&val.trim()?`<div class="dosage-card ${label==='Adulte'?'dosage-adult':label==='Pédiatrie'?'dosage-ped':'dosage-info'}"><div class="dosage-label">${label}</div><div class="dosage-value">${val.replace(/\n/g,'<br>')}</div></div>`:'';
+  const listStr=(items,cls)=>items&&items.length?`<ul class="${cls}">`+items.map(i=>`<li>${i}</li>`).join('')+'</ul>':'<p style="color:var(--text-muted);font-size:.85rem;">Non précisé dans les documents CORFA fournis.</p>';
+
+  document.getElementById('ficheContent').innerHTML=`
+    <div class="fiche-title">${m.molecule}</div>
+    <div class="fiche-commercial">💊 ${m.nomCommercial||'—'}</div>
+    <div class="fiche-classe">🏷 ${m.classe||'—'}</div>
+
+    <div class="fiche-section">
+      <div class="fiche-section-title">Algorithmes CORFA</div>
+      ${m.algorithmes.map(a=>`<span class="algo-badge">${a}</span>`).join('')}
+    </div>
+
+    <div class="fiche-section">
+      <div class="fiche-section-title">Indications CORFA</div>
+      ${listStr(m.indications,'rq-list')}
+    </div>
+
+    <div class="fiche-section">
+      <div class="fiche-section-title">Dosages CORFA</div>
+      ${dosStr('Adulte',m.dosages.adulte)}
+      ${dosStr('Pédiatrie',m.dosages.pediatrie)}
+      ${dosStr('Répétition',m.dosages.repetition)}
+      ${dosStr('Dose max',m.dosages.doseMax)}
+      ${dosStr('Voie',m.dosages.voie+' '+routeBadges(m.dosages.voie))}
+      ${dosStr('Dilution',m.dosages.dilution)}
+      ${dosStr('Vitesse / Remarque admin.',m.dosages.vitesse)}
+    </div>
+
+    <div class="fiche-section">
+      <div class="fiche-section-title">⛔ Contre-indications</div>
+      ${listStr(m.contreIndications,'ci-list')}
+    </div>
+
+    <div class="fiche-section">
+      <div class="fiche-section-title">⚠️ Effets secondaires</div>
+      ${listStr(m.effetsSecondaires,'ei-list')}
+    </div>
+
+    <div class="fiche-section">
+      <div class="fiche-section-title">ℹ️ Remarques / Précautions</div>
+      ${listStr(m.remarques,'rq-list')}
+    </div>
+
+    <div class="fiche-section">
+      <div class="fiche-section-title">📄 Sources</div>
+      ${listStr(m.sources,'source-list')}
+    </div>
+
+    <div class="disclaimer" style="margin-top:16px;">⚠️ Ce module reprend uniquement les informations extraites des documents CORFA fournis. Toujours vérifier le protocole officiel à jour avant administration.</div>
+  `;
+  fv.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function corfaBackToList(){
+  document.getElementById('ficheView').classList.remove('show');
+  document.getElementById('corfaListView').style.display='block';
+  document.getElementById('ficheContent').innerHTML='';
+}
+
+// Init au chargement
+window.addEventListener('DOMContentLoaded',()=>{
+  initCorfaFilters();
+  corfaFilter();
+});
+</script>
+</body>
+</html>
