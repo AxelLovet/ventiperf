@@ -696,7 +696,7 @@ function switchTab(name){
 ============================================= */
 let ventTimer=null,ventStartTime=null,ventElapsed=0,ventCount=0,ventRunning=false;
 let signalTimeout=null,wakeLock=null,audioCtx=null;
-let nextBipTimeout=null; // setTimeout pour le visuel + re-scheduling
+let bipInterval=null; // setInterval fixe — tourne en continu, indépendant de la pause
 const CYCLE_MS=6000,SIGNAL_MS=600;
 
 function initAudio(){
@@ -704,16 +704,15 @@ function initAudio(){
   if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
 }
 
-// Joue le double BIP-BIP à un instant précis sur l'horloge Web Audio (t = audioCtx.currentTime cible)
-// L'horloge Web Audio est indépendante du thread JS — jamais throttlée par le navigateur
-function playBipAt(t){
+// Double BIP-BIP joué immédiatement — simple et fiable
+function playBip(){
   if(!audioCtx)return;
   try{
+    const t=audioCtx.currentTime;
     const comp=audioCtx.createDynamicsCompressor();
     comp.threshold.value=-6;comp.knee.value=3;comp.ratio.value=6;
-    comp.attack.value=0;comp.release.value=0.1;
-    comp.connect(audioCtx.destination);
-    // BIP 1 : 1100 Hz — tranchant
+    comp.attack.value=0;comp.release.value=0.1;comp.connect(audioCtx.destination);
+    // BIP 1 : 1100 Hz
     const o1=audioCtx.createOscillator(),g1=audioCtx.createGain();
     o1.connect(g1);g1.connect(comp);o1.type='square';
     o1.frequency.setValueAtTime(1100,t);
@@ -730,29 +729,6 @@ function playBipAt(t){
   }catch(e){}
 }
 
-// Programme le prochain bip numéro `bipNum` (1, 2, 3…)
-// Audio schedulé sur l'horloge Web Audio (précis même si le thread JS est occupé)
-// Visuel schedulé via setTimeout (suffisant pour l'affichage)
-function scheduleBip(bipNum){
-  if(!ventRunning||!audioCtx)return;
-  const elapsed=ventElapsed+(Date.now()-ventStartTime);
-  const targetMs=bipNum*CYCLE_MS;          // quand ce bip doit sonner depuis le démarrage
-  let msUntil=targetMs-elapsed;
-  if(msUntil<0)msUntil=0;                  // si en retard, jouer immédiatement
-  // 1. Programmer l'audio sur l'horloge Web Audio — ne sera jamais retardé
-  const audioTarget=audioCtx.currentTime+(msUntil/1000);
-  playBipAt(audioTarget);
-  // 2. Programmer le visuel + re-scheduling du bip suivant via setTimeout
-  clearTimeout(nextBipTimeout);
-  nextBipTimeout=setTimeout(()=>{
-    if(!ventRunning)return;
-    ventCount=bipNum;
-    document.getElementById('ventCount').textContent=ventCount;
-    showVentSignal();
-    scheduleBip(bipNum+1); // chaîner le prochain bip
-  },msUntil);
-}
-
 function showVentSignal(){
   const card=document.getElementById('chronoCard'),signal=document.getElementById('ventSignal');
   card.classList.add('flash');signal.classList.add('show');
@@ -763,7 +739,7 @@ function formatTime(ms){
   const s=Math.floor(ms/1000),m=Math.floor(s/60).toString().padStart(2,'0'),sec=(s%60).toString().padStart(2,'0');
   return m+':'+sec;
 }
-// rAF uniquement pour le chrono et la barre de progression — plus de détection du bip ici
+// rAF uniquement pour l'affichage (chrono + barre) — ne déclenche plus jamais le son
 function ventLoop(){
   if(!ventRunning)return;
   const elapsed=ventElapsed+(Date.now()-ventStartTime);
@@ -773,9 +749,18 @@ function ventLoop(){
 }
 function ventStart(){
   initAudio();if(ventRunning)return;ventRunning=true;ventStartTime=Date.now();
-  // Lancer l'affichage (rAF) et programmer le 1er bip
   ventTimer=requestAnimationFrame(ventLoop);
-  scheduleBip(ventCount+1);
+  // setInterval fixe : bip toutes les 6 s dès le démarrage, continue pendant la pause
+  // Une seule instance — on ne recrée jamais l'interval si déjà en cours
+  if(!bipInterval){
+    bipInterval=setInterval(()=>{
+      if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
+      ventCount++;
+      document.getElementById('ventCount').textContent=ventCount;
+      playBip();
+      showVentSignal();
+    },CYCLE_MS);
+  }
   document.getElementById('btnStart').disabled=true;
   document.getElementById('btnPause').disabled=false;
   document.getElementById('btnReset').disabled=false;
@@ -786,7 +771,7 @@ function ventPause(){
   ventRunning=false;
   ventElapsed+=Date.now()-ventStartTime;
   cancelAnimationFrame(ventTimer);
-  clearTimeout(nextBipTimeout); // annuler le bip schedulé
+  // NE PAS clearInterval ici — les bips continuent pendant la pause
   document.getElementById('btnStart').disabled=false;
   document.getElementById('btnStart').textContent='▶ Reprendre';
   document.getElementById('btnPause').disabled=true;
@@ -795,7 +780,7 @@ function ventPause(){
 function ventReset(){
   ventRunning=false;
   cancelAnimationFrame(ventTimer);
-  clearTimeout(nextBipTimeout);
+  clearInterval(bipInterval);bipInterval=null; // stopper les bips
   clearTimeout(signalTimeout);
   ventElapsed=0;ventCount=0;ventStartTime=null;
   document.getElementById('chronoDisplay').textContent='00:00';
