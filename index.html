@@ -694,34 +694,65 @@ function switchTab(name){
 /* =============================================
    VENTILATION
 ============================================= */
-let ventTimer=null,ventStartTime=null,ventElapsed=0,ventCount=0,ventRunning=false,signalTimeout=null,wakeLock=null,audioCtx=null;
+let ventTimer=null,ventStartTime=null,ventElapsed=0,ventCount=0,ventRunning=false;
+let signalTimeout=null,wakeLock=null,audioCtx=null;
+let nextBipTimeout=null; // setTimeout pour le visuel + re-scheduling
 const CYCLE_MS=6000,SIGNAL_MS=600;
 
 function initAudio(){
   if(!audioCtx){try{audioCtx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}
   if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
 }
-function playBip(){
+
+// Joue le double BIP-BIP à un instant précis sur l'horloge Web Audio (t = audioCtx.currentTime cible)
+// L'horloge Web Audio est indépendante du thread JS — jamais throttlée par le navigateur
+function playBipAt(t){
   if(!audioCtx)return;
   try{
-    const t=audioCtx.currentTime;
-    // Double bip court : BIP-BIP — reconnaissable, perçant, mémorisable
-    // BIP 1 : 1100 Hz — court et tranchant
-    const tone1=ctx=>{ const o=ctx.createOscillator(),g=ctx.createGain(); o.connect(g);g.connect(ctx.destination); o.type='square'; o.frequency.setValueAtTime(1100,t); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(1.0,t+0.01); g.gain.setValueAtTime(1.0,t+0.08); g.gain.exponentialRampToValueAtTime(0.001,t+0.15); o.start(t);o.stop(t+0.15); };
-    // BIP 2 : 880 Hz — légèrement plus bas, 0.18 s après
-    const tone2=ctx=>{ const o=ctx.createOscillator(),g=ctx.createGain(); o.connect(g);g.connect(ctx.destination); o.type='square'; o.frequency.setValueAtTime(880,t+0.18); g.gain.setValueAtTime(0,t+0.18); g.gain.linearRampToValueAtTime(1.0,t+0.19); g.gain.setValueAtTime(1.0,t+0.26); g.gain.exponentialRampToValueAtTime(0.001,t+0.33); o.start(t+0.18);o.stop(t+0.33); };
-    // Compresseur dynamique pour éviter la saturation et maximiser la puissance perçue
-    const comp=audioCtx.createDynamicsCompressor();comp.threshold.value=-6;comp.knee.value=3;comp.ratio.value=6;comp.attack.value=0;comp.release.value=0.1;comp.connect(audioCtx.destination);
+    const comp=audioCtx.createDynamicsCompressor();
+    comp.threshold.value=-6;comp.knee.value=3;comp.ratio.value=6;
+    comp.attack.value=0;comp.release.value=0.1;
+    comp.connect(audioCtx.destination);
+    // BIP 1 : 1100 Hz — tranchant
     const o1=audioCtx.createOscillator(),g1=audioCtx.createGain();
-    o1.connect(g1);g1.connect(comp);o1.type='square';o1.frequency.setValueAtTime(1100,t);
-    g1.gain.setValueAtTime(0,t);g1.gain.linearRampToValueAtTime(1.0,t+0.01);g1.gain.setValueAtTime(1.0,t+0.08);g1.gain.exponentialRampToValueAtTime(0.001,t+0.15);
+    o1.connect(g1);g1.connect(comp);o1.type='square';
+    o1.frequency.setValueAtTime(1100,t);
+    g1.gain.setValueAtTime(0,t);g1.gain.linearRampToValueAtTime(1.0,t+0.01);
+    g1.gain.setValueAtTime(1.0,t+0.08);g1.gain.exponentialRampToValueAtTime(0.001,t+0.15);
     o1.start(t);o1.stop(t+0.16);
+    // BIP 2 : 880 Hz — 0.18 s après
     const o2=audioCtx.createOscillator(),g2=audioCtx.createGain();
-    o2.connect(g2);g2.connect(comp);o2.type='square';o2.frequency.setValueAtTime(880,t+0.18);
-    g2.gain.setValueAtTime(0,t+0.18);g2.gain.linearRampToValueAtTime(1.0,t+0.19);g2.gain.setValueAtTime(1.0,t+0.26);g2.gain.exponentialRampToValueAtTime(0.001,t+0.34);
+    o2.connect(g2);g2.connect(comp);o2.type='square';
+    o2.frequency.setValueAtTime(880,t+0.18);
+    g2.gain.setValueAtTime(0,t+0.18);g2.gain.linearRampToValueAtTime(1.0,t+0.19);
+    g2.gain.setValueAtTime(1.0,t+0.26);g2.gain.exponentialRampToValueAtTime(0.001,t+0.34);
     o2.start(t+0.18);o2.stop(t+0.35);
   }catch(e){}
 }
+
+// Programme le prochain bip numéro `bipNum` (1, 2, 3…)
+// Audio schedulé sur l'horloge Web Audio (précis même si le thread JS est occupé)
+// Visuel schedulé via setTimeout (suffisant pour l'affichage)
+function scheduleBip(bipNum){
+  if(!ventRunning||!audioCtx)return;
+  const elapsed=ventElapsed+(Date.now()-ventStartTime);
+  const targetMs=bipNum*CYCLE_MS;          // quand ce bip doit sonner depuis le démarrage
+  let msUntil=targetMs-elapsed;
+  if(msUntil<0)msUntil=0;                  // si en retard, jouer immédiatement
+  // 1. Programmer l'audio sur l'horloge Web Audio — ne sera jamais retardé
+  const audioTarget=audioCtx.currentTime+(msUntil/1000);
+  playBipAt(audioTarget);
+  // 2. Programmer le visuel + re-scheduling du bip suivant via setTimeout
+  clearTimeout(nextBipTimeout);
+  nextBipTimeout=setTimeout(()=>{
+    if(!ventRunning)return;
+    ventCount=bipNum;
+    document.getElementById('ventCount').textContent=ventCount;
+    showVentSignal();
+    scheduleBip(bipNum+1); // chaîner le prochain bip
+  },msUntil);
+}
+
 function showVentSignal(){
   const card=document.getElementById('chronoCard'),signal=document.getElementById('ventSignal');
   card.classList.add('flash');signal.classList.add('show');
@@ -732,38 +763,50 @@ function formatTime(ms){
   const s=Math.floor(ms/1000),m=Math.floor(s/60).toString().padStart(2,'0'),sec=(s%60).toString().padStart(2,'0');
   return m+':'+sec;
 }
+// rAF uniquement pour le chrono et la barre de progression — plus de détection du bip ici
 function ventLoop(){
   if(!ventRunning)return;
-  const now=Date.now(),elapsed=ventElapsed+(now-ventStartTime);
+  const elapsed=ventElapsed+(Date.now()-ventStartTime);
   document.getElementById('chronoDisplay').textContent=formatTime(elapsed);
   document.getElementById('progressBar').style.width=((elapsed%CYCLE_MS)/CYCLE_MS*100)+'%';
-  const expected=Math.floor(elapsed/CYCLE_MS);
-  if(expected>ventCount){ventCount=expected;document.getElementById('ventCount').textContent=ventCount;playBip();showVentSignal();}
   ventTimer=requestAnimationFrame(ventLoop);
 }
 function ventStart(){
   initAudio();if(ventRunning)return;ventRunning=true;ventStartTime=Date.now();
+  // Lancer l'affichage (rAF) et programmer le 1er bip
   ventTimer=requestAnimationFrame(ventLoop);
+  scheduleBip(ventCount+1);
   document.getElementById('btnStart').disabled=true;
   document.getElementById('btnPause').disabled=false;
   document.getElementById('btnReset').disabled=false;
   requestWakeLock();
 }
 function ventPause(){
-  if(!ventRunning)return;ventRunning=false;ventElapsed+=Date.now()-ventStartTime;cancelAnimationFrame(ventTimer);
-  document.getElementById('btnStart').disabled=false;document.getElementById('btnStart').textContent='▶ Reprendre';
-  document.getElementById('btnPause').disabled=true;releaseWakeLock();
+  if(!ventRunning)return;
+  ventRunning=false;
+  ventElapsed+=Date.now()-ventStartTime;
+  cancelAnimationFrame(ventTimer);
+  clearTimeout(nextBipTimeout); // annuler le bip schedulé
+  document.getElementById('btnStart').disabled=false;
+  document.getElementById('btnStart').textContent='▶ Reprendre';
+  document.getElementById('btnPause').disabled=true;
+  releaseWakeLock();
 }
 function ventReset(){
-  ventRunning=false;cancelAnimationFrame(ventTimer);clearTimeout(signalTimeout);
+  ventRunning=false;
+  cancelAnimationFrame(ventTimer);
+  clearTimeout(nextBipTimeout);
+  clearTimeout(signalTimeout);
   ventElapsed=0;ventCount=0;ventStartTime=null;
   document.getElementById('chronoDisplay').textContent='00:00';
   document.getElementById('ventCount').textContent='0';
   document.getElementById('progressBar').style.width='0%';
   document.getElementById('chronoCard').classList.remove('flash');
   document.getElementById('ventSignal').classList.remove('show');
-  document.getElementById('btnStart').disabled=false;document.getElementById('btnStart').textContent='▶ Démarrer';
-  document.getElementById('btnPause').disabled=true;document.getElementById('btnReset').disabled=true;
+  document.getElementById('btnStart').disabled=false;
+  document.getElementById('btnStart').textContent='▶ Démarrer';
+  document.getElementById('btnPause').disabled=true;
+  document.getElementById('btnReset').disabled=true;
   releaseWakeLock();
 }
 async function requestWakeLock(){
