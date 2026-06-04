@@ -118,11 +118,25 @@
         <div class="vent-info-item"><div class="vent-info-label">Fréquence</div><div class="vent-info-value">10 / min</div></div>
         <div class="vent-info-item"><div class="vent-info-label">Ventilations</div><div class="vent-info-value" id="ventCount">0</div></div>
       </div>
-      <div class="chrono-card" id="chronoCard">
-        <div class="chrono-label">Temps écoulé</div>
-        <div class="chrono-time" id="chronoDisplay">00:00</div>
-        <div class="ventiler-signal" id="ventSignal">VENTILER !</div>
-        <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progressBar"></div></div>
+      <!-- Double chrono : total + cycle -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+
+        <!-- Chrono 1 : temps total -->
+        <div class="chrono-card" style="margin-bottom:0;padding:18px 10px;">
+          <div class="chrono-label">Temps total</div>
+          <div class="chrono-time" id="chronoDisplay" style="font-size:2.6rem;">00:00</div>
+          <div style="font-size:.7rem;color:var(--text-muted);margin-top:4px;">Ventilations</div>
+          <div style="font-size:1.6rem;font-weight:800;color:var(--success);" id="ventCountBig">0</div>
+        </div>
+
+        <!-- Chrono 2 : compte à rebours cycle 6s -->
+        <div class="chrono-card" id="chronoCard" style="margin-bottom:0;padding:18px 10px;">
+          <div class="chrono-label">Prochain bip</div>
+          <div class="chrono-time" id="countdownDisplay" style="font-size:2.6rem;color:var(--warning);">6.0</div>
+          <div class="ventiler-signal" id="ventSignal" style="font-size:1.2rem;min-height:1.6rem;">VENTILER !</div>
+          <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progressBar"></div></div>
+        </div>
+
       </div>
       <div class="vent-controls">
         <button class="btn btn-success btn-start" id="btnStart" onclick="ventStart()">▶ Démarrer</button>
@@ -696,7 +710,7 @@ function switchTab(name){
 ============================================= */
 let ventTimer=null,ventStartTime=null,ventElapsed=0,ventCount=0,ventRunning=false;
 let signalTimeout=null,wakeLock=null,audioCtx=null;
-let bipInterval=null; // setInterval fixe — tourne en continu, indépendant de la pause
+let bipTimeout=null,bipInterval=null; // timeout pour le premier bip calé, puis interval régulier
 const CYCLE_MS=6000,SIGNAL_MS=600;
 
 function initAudio(){
@@ -704,7 +718,6 @@ function initAudio(){
   if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
 }
 
-// Double BIP-BIP joué immédiatement — simple et fiable
 function playBip(){
   if(!audioCtx)return;
   try{
@@ -712,14 +725,12 @@ function playBip(){
     const comp=audioCtx.createDynamicsCompressor();
     comp.threshold.value=-6;comp.knee.value=3;comp.ratio.value=6;
     comp.attack.value=0;comp.release.value=0.1;comp.connect(audioCtx.destination);
-    // BIP 1 : 1100 Hz
     const o1=audioCtx.createOscillator(),g1=audioCtx.createGain();
     o1.connect(g1);g1.connect(comp);o1.type='square';
     o1.frequency.setValueAtTime(1100,t);
     g1.gain.setValueAtTime(0,t);g1.gain.linearRampToValueAtTime(1.0,t+0.01);
     g1.gain.setValueAtTime(1.0,t+0.08);g1.gain.exponentialRampToValueAtTime(0.001,t+0.15);
     o1.start(t);o1.stop(t+0.16);
-    // BIP 2 : 880 Hz — 0.18 s après
     const o2=audioCtx.createOscillator(),g2=audioCtx.createGain();
     o2.connect(g2);g2.connect(comp);o2.type='square';
     o2.frequency.setValueAtTime(880,t+0.18);
@@ -727,6 +738,32 @@ function playBip(){
     g2.gain.setValueAtTime(1.0,t+0.26);g2.gain.exponentialRampToValueAtTime(0.001,t+0.34);
     o2.start(t+0.18);o2.stop(t+0.35);
   }catch(e){}
+}
+
+function fireBip(){
+  if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
+  ventCount++;
+  document.getElementById('ventCount').textContent=ventCount;
+  document.getElementById('ventCountBig').textContent=ventCount;
+  playBip();
+  showVentSignal();
+}
+
+// Démarre le scheduling des bips en tenant compte du temps déjà écoulé (ventElapsed).
+// Le premier bip tombe à la prochaine marque de 6s, puis setInterval prend le relais.
+function startBipSchedule(){
+  stopBipSchedule(); // sécurité : ne jamais en lancer deux
+  const timeInCycle=ventElapsed%CYCLE_MS;
+  const msUntilNext=timeInCycle===0?CYCLE_MS:(CYCLE_MS-timeInCycle);
+  bipTimeout=setTimeout(()=>{
+    fireBip();
+    bipInterval=setInterval(fireBip,CYCLE_MS);
+  },msUntilNext);
+}
+
+function stopBipSchedule(){
+  clearTimeout(bipTimeout);bipTimeout=null;
+  clearInterval(bipInterval);bipInterval=null;
 }
 
 function showVentSignal(){
@@ -739,28 +776,23 @@ function formatTime(ms){
   const s=Math.floor(ms/1000),m=Math.floor(s/60).toString().padStart(2,'0'),sec=(s%60).toString().padStart(2,'0');
   return m+':'+sec;
 }
-// rAF uniquement pour l'affichage (chrono + barre) — ne déclenche plus jamais le son
 function ventLoop(){
   if(!ventRunning)return;
   const elapsed=ventElapsed+(Date.now()-ventStartTime);
+  // Chrono 1 : temps total
   document.getElementById('chronoDisplay').textContent=formatTime(elapsed);
-  document.getElementById('progressBar').style.width=((elapsed%CYCLE_MS)/CYCLE_MS*100)+'%';
+  // Chrono 2 : compte à rebours vers le prochain bip
+  const timeInCycle=elapsed%CYCLE_MS;
+  const remaining=(CYCLE_MS-timeInCycle)/1000;
+  document.getElementById('countdownDisplay').textContent=remaining.toFixed(1);
+  // Barre de progression
+  document.getElementById('progressBar').style.width=(timeInCycle/CYCLE_MS*100)+'%';
   ventTimer=requestAnimationFrame(ventLoop);
 }
 function ventStart(){
   initAudio();if(ventRunning)return;ventRunning=true;ventStartTime=Date.now();
   ventTimer=requestAnimationFrame(ventLoop);
-  // setInterval fixe : bip toutes les 6 s dès le démarrage, continue pendant la pause
-  // Une seule instance — on ne recrée jamais l'interval si déjà en cours
-  if(!bipInterval){
-    bipInterval=setInterval(()=>{
-      if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
-      ventCount++;
-      document.getElementById('ventCount').textContent=ventCount;
-      playBip();
-      showVentSignal();
-    },CYCLE_MS);
-  }
+  startBipSchedule(); // bips calés sur le temps écoulé
   document.getElementById('btnStart').disabled=true;
   document.getElementById('btnPause').disabled=false;
   document.getElementById('btnReset').disabled=false;
@@ -771,7 +803,7 @@ function ventPause(){
   ventRunning=false;
   ventElapsed+=Date.now()-ventStartTime;
   cancelAnimationFrame(ventTimer);
-  // NE PAS clearInterval ici — les bips continuent pendant la pause
+  stopBipSchedule(); // bips en pause
   document.getElementById('btnStart').disabled=false;
   document.getElementById('btnStart').textContent='▶ Reprendre';
   document.getElementById('btnPause').disabled=true;
@@ -784,7 +816,9 @@ function ventReset(){
   clearTimeout(signalTimeout);
   ventElapsed=0;ventCount=0;ventStartTime=null;
   document.getElementById('chronoDisplay').textContent='00:00';
+  document.getElementById('countdownDisplay').textContent='6.0';
   document.getElementById('ventCount').textContent='0';
+  document.getElementById('ventCountBig').textContent='0';
   document.getElementById('progressBar').style.width='0%';
   document.getElementById('chronoCard').classList.remove('flash');
   document.getElementById('ventSignal').classList.remove('show');
